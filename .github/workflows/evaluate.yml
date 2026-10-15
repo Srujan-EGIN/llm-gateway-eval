@@ -1,0 +1,43 @@
+name: Evaluate gateways
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore: ["results/**", "*.md"]
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install
+        run: uv sync --frozen
+
+      - name: Pull pinned images
+        run: python3 -c "import json;[print(v) for v in json.load(open('images.json')).values()]" | xargs -n1 docker pull -q
+
+      - name: Run evaluation
+        run: uv run python scripts/run_eval.py
+        continue-on-error: true  # MLflow's expected failures are findings, not a broken build
+
+      - name: Publish report
+        if: always()
+        run: cat results/REPORT.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-and-logs
+          path: |
+            results/
+            runs/*/*.log
+            runs/*/results.jsonl
+            runs/*/junit.xml

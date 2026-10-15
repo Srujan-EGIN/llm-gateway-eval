@@ -11,6 +11,7 @@ Host ports (127.0.0.1 only):
   5000  MLflow server with its AI Gateway (both profiles are endpoints on one server)
 """
 
+import base64
 import json
 import os
 import secrets
@@ -129,7 +130,11 @@ def start_litellm(profile: str, port: int) -> None:
 
 
 # ---------------------------------------------------------------- MLflow
-def start_mlflow() -> None:
+MLFLOW_ADMIN = ("admin", "Adm-" + secrets.token_hex(12))
+MLFLOW_APP_USER = ("app-user", "App-" + secrets.token_hex(12))
+
+
+def start_mlflow(name: str = "mlflow", port: int = 5000, login: bool = False) -> None:
     env = {
         "MLFLOW_CRYPTO_KEK_PASSPHRASE": secrets.token_hex(24),
         "MLFLOW_GATEWAY_API_BASE_ALLOW_PRIVATE_IPS": "true",  # provider is on a private network
@@ -137,23 +142,30 @@ def start_mlflow() -> None:
         # MLflow only accepts https provider URLs by default; the mock is plain http.
         "MLFLOW_GATEWAY_API_BASE_ALLOWED_SCHEMES": "http,https",
     }
-    run_container("mlflow", IMAGES["mlflow"],
-                  ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000",
-                   "--backend-store-uri", "sqlite:////data/mlflow.db",
-                   "--default-artifact-root", "/data/artifacts",
-                   "--allowed-hosts", "localhost:5000,127.0.0.1:5000",
-                   "--workers", "1"],
-                  ports=["5000:5000"], env=env, mounts=[f"{PREFIX}mlflow-data:/data"])
+    args = ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000",
+            "--backend-store-uri", "sqlite:////data/mlflow.db",
+            "--default-artifact-root", "/data/artifacts",
+            "--allowed-hosts", f"localhost:{port},127.0.0.1:{port},{PREFIX}{name}:5000",
+            "--workers", "1"]
+    if login:
+        # MLflow's optional login add-on. Needs the "-full" image (mlflow[auth]).
+        args += ["--app-name", "basic-auth"]
+        env["MLFLOW_AUTH_ADMIN_PASSWORD"] = MLFLOW_ADMIN[1]
+        env["MLFLOW_FLASK_SERVER_SECRET_KEY"] = secrets.token_hex(16)
+    run_container(name, IMAGES["mlflow_login" if login else "mlflow"], args,
+                  ports=[f"{port}:5000"], env=env, mounts=[f"{PREFIX}{name}-data:/data"])
 
 
-def provision_mlflow() -> None:
+def provision_mlflow(url: str = "http://127.0.0.1:5000", login: bool = False) -> None:
     """Create MLflow gateway endpoints equivalent to the LiteLLM config."""
+    if login:
+        os.environ["MLFLOW_TRACKING_USERNAME"], os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_ADMIN
     from mlflow.entities.gateway_endpoint import (FallbackConfig, FallbackStrategy,
                                                   GatewayEndpointModelConfig,
                                                   GatewayModelLinkageType)
     from mlflow.tracking._tracking_service.utils import _get_store
 
-    store = _get_store("http://127.0.0.1:5000")
+    store = _get_store(url)
     secret = store.create_gateway_secret(
         secret_name="mock-key", secret_value={"api_key": "fake-key"}, provider="openai",
         auth_config={"api_base": f"{MOCK_IN_NET}/v1"})
@@ -186,6 +198,29 @@ def provision_mlflow() -> None:
     endpoint("fast-model-default", "fast-model", tracking=True)
     endpoint("gpt-4o-mini-default", "gpt-4o-mini", tracking=True)
 
+    if login:
+        _mlflow_limited_user(url, store)
+        del os.environ["MLFLOW_TRACKING_USERNAME"], os.environ["MLFLOW_TRACKING_PASSWORD"]
+
+
+def _mlflow_limited_user(url: str, store) -> None:
+    """A non-admin user that may USE every endpoint except outside-model (like a per-mode key)."""
+    def post(path, body):
+        r = httpx.post(url + path, json=body, auth=MLFLOW_ADMIN, timeout=30)
+        r.raise_for_status()
+        return r.json()
+
+    post("/api/2.0/mlflow/users/create",
+         {"username": MLFLOW_APP_USER[0], "password": MLFLOW_APP_USER[1]})
+    role_id = post("/api/3.0/mlflow/roles/create",
+                   {"name": "eu-mode", "workspace": "default"})["role"]["id"]
+    for name in ["fast-model", "smart-model", "gpt-4o-mini", "embed-model", "eu-chat"]:
+        ep = store.get_gateway_endpoint(name=name)
+        post("/api/3.0/mlflow/roles/permissions/add",
+             {"role_id": role_id, "resource_type": "gateway_endpoint",
+              "resource_pattern": ep.endpoint_id, "permission": "USE"})
+    post("/api/3.0/mlflow/roles/assign", {"username": MLFLOW_APP_USER[0], "role_id": role_id})
+
 
 # ---------------------------------------------------------------- main
 def targets() -> dict:
@@ -194,12 +229,23 @@ def targets() -> dict:
         "run_dir": str(RUN_DIR),
         "mock": MOCK_FROM_HOST,
         "images": IMAGES,
+        # Only used by the security tests: MLflow with its optional login add-on switched on.
+        "security_only": {
+            "mlflow_login": {
+                "base_url": "http://127.0.0.1:5001/gateway/mlflow/v1",
+                "root_url": "http://127.0.0.1:5001",
+                "auth_header": "Basic " + base64.b64encode(
+                    f"{MLFLOW_APP_USER[0]}:{MLFLOW_APP_USER[1]}".encode()).decode(),
+                "sinks": [{"type": "logs", "container": PREFIX + "mlflow-login"}],
+            },
+        },
         "gateways": {
             "litellm": {
                 "base_url": "http://127.0.0.1:4000/v1",
                 "root_url": "http://127.0.0.1:4000",
                 "embeddings_url": "http://127.0.0.1:4000/v1",
                 "api_key": MASTER_KEY,
+                "auth_header": f"Bearer {MASTER_KEY}",
                 "sinks": [{"type": "logs", "container": PREFIX + "litellm-hardened"},
                           {**pg, "db": "litellm_hardened"}],
                 "default_profile": {
@@ -214,6 +260,7 @@ def targets() -> dict:
                 "root_url": "http://127.0.0.1:5000",
                 "embeddings_url": "http://127.0.0.1:5000/gateway/openai/v1",
                 "api_key": "not-needed",
+                "auth_header": None,
                 "sinks": [{"type": "logs", "container": PREFIX + "mlflow"},
                           {"type": "dir", "container": PREFIX + "mlflow", "path": "/data"}],
                 "default_profile": {
@@ -229,7 +276,7 @@ def targets() -> dict:
 
 
 def save_logs() -> None:
-    for c in ["mock", "pg", "litellm-hardened", "litellm-default", "mlflow"]:
+    for c in ["mock", "pg", "litellm-hardened", "litellm-default", "mlflow", "mlflow-login"]:
         out = docker("logs", PREFIX + c, check=False)
         (RUN_DIR / f"{c}.log").write_text((out.stdout or "") + (out.stderr or ""),
                                           encoding="utf-8")
@@ -257,20 +304,30 @@ def main() -> int:
                 break
             time.sleep(1)
         time.sleep(2)
+        # Postgres restarts once during first-time init, so retry until it accepts commands.
         for db in ("litellm_hardened", "litellm_default"):
-            docker("exec", PREFIX + "pg", "psql", "-U", "postgres", "-c", f"CREATE DATABASE {db}")
+            for attempt in range(30):
+                if docker("exec", PREFIX + "pg", "psql", "-U", "postgres", "-c",
+                          f"CREATE DATABASE {db}", check=False).returncode == 0:
+                    break
+                time.sleep(1)
+            else:
+                raise RuntimeError(f"could not create database {db}")
 
         start_litellm("hardened", 4000)
         start_litellm("default", 4001)
         start_mlflow()
+        start_mlflow("mlflow-login", 5001, login=True)
 
         wait_http(f"{MOCK_FROM_HOST}/health")
         auth = {"Authorization": f"Bearer {MASTER_KEY}"}
         for port in (4000, 4001):
             wait_http(f"http://127.0.0.1:{port}/health/liveliness", timeout=300, headers=auth)
         wait_http("http://127.0.0.1:5000/health", timeout=300)
+        wait_http("http://127.0.0.1:5001/health", timeout=300)
         log("all services up; provisioning MLflow endpoints")
         provision_mlflow()
+        provision_mlflow("http://127.0.0.1:5001", login=True)
 
         targets_file = RUN_DIR / "targets.json"
         targets_file.write_text(json.dumps(targets(), indent=2))

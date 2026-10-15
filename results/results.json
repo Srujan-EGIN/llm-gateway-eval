@@ -1,0 +1,479 @@
+[
+  {
+    "check": "test_chat",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tokens reported": 7
+    },
+    "doc": "Chat completion works"
+  },
+  {
+    "check": "test_chat",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tokens reported": 7
+    },
+    "doc": "Chat completion works"
+  },
+  {
+    "check": "test_streaming",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "chunks": 4
+    },
+    "doc": "Streaming works"
+  },
+  {
+    "check": "test_streaming",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "chunks": 4
+    },
+    "doc": "Streaming works"
+  },
+  {
+    "check": "test_tool_calling",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tool called": "get_weather"
+    },
+    "doc": "Tool calling works"
+  },
+  {
+    "check": "test_tool_calling",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tool called": "get_weather"
+    },
+    "doc": "Tool calling works"
+  },
+  {
+    "check": "test_embeddings",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "vectors": 2
+    },
+    "doc": "Embeddings work"
+  },
+  {
+    "check": "test_embeddings",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "vectors": 2
+    },
+    "doc": "Embeddings work"
+  },
+  {
+    "check": "test_unknown_model_rejected",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status": 400
+    },
+    "doc": "Unknown model names are refused"
+  },
+  {
+    "check": "test_unknown_model_rejected",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status": 404
+    },
+    "doc": "Unknown model names are refused"
+  },
+  {
+    "check": "test_fallback_used",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "broken-model -> backup-model"
+    },
+    "doc": "Falls back to the backup when the main model fails"
+  },
+  {
+    "check": "test_fallback_used",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "broken-model -> backup-model"
+    },
+    "doc": "Falls back to the backup when the main model fails"
+  },
+  {
+    "check": "test_fallback_stays_in_allowed_list",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "models called over 10 requests": "backup-model, broken-model"
+    },
+    "doc": "Fallback never uses a model outside the allowed list"
+  },
+  {
+    "check": "test_fallback_stays_in_allowed_list",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "models called over 10 requests": "backup-model, broken-model"
+    },
+    "doc": "Fallback never uses a model outside the allowed list"
+  },
+  {
+    "check": "test_no_retention_hardened",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "prompt found in": "nowhere"
+    },
+    "doc": "Hardened settings: prompt text is stored nowhere"
+  },
+  {
+    "check": "test_no_retention_hardened",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "prompt found in": "nowhere"
+    },
+    "doc": "Hardened settings: prompt text is stored nowhere"
+  },
+  {
+    "check": "test_retention_default",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "stores prompts by default": "no",
+      "prompt found in": "nowhere"
+    },
+    "doc": "Default settings: is prompt text stored? (informational)"
+  },
+  {
+    "check": "test_retention_default",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "stores prompts by default": "yes",
+      "prompt found in": "file /data/mlflow.db; 2 trace files"
+    },
+    "doc": "Default settings: is prompt text stored? (informational)"
+  },
+  {
+    "check": "test_cost_tracked_default",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "cost of one call (USD)": 3.15e-06
+    },
+    "doc": "Default settings: cost is tracked per call"
+  },
+  {
+    "check": "test_cost_tracked_default",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "cost of one call (USD)": 3.15e-06
+    },
+    "doc": "Default settings: cost is tracked per call"
+  },
+  {
+    "check": "test_cost_tracked_with_no_retention",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "cost of one call (USD)": 3.15e-06,
+      "usage row in database": {
+        "model": "openai/gpt-4o-mini",
+        "spend": 3.15e-06,
+        "total_tokens": 6
+      },
+      "prompt stored in that row": false
+    },
+    "doc": "Cost is still tracked while No-Retention settings are on"
+  },
+  {
+    "check": "test_cost_tracked_with_no_retention",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "AssertionError: no cost available: cost tracking depends on stored request traces\nassert (None)",
+    "details": {
+      "cost of one call (USD)": null
+    },
+    "doc": "Cost is still tracked while No-Retention settings are on"
+  },
+  {
+    "check": "test_requires_key",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status without key": 401
+    },
+    "doc": "Calls without a key are refused"
+  },
+  {
+    "check": "test_requires_key",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "assert 200 in (401, 403)\n +  where 200 = <Response [200 OK]>.status_code",
+    "details": {
+      "status without key": 200
+    },
+    "doc": "Calls without a key are refused"
+  },
+  {
+    "check": "test_requires_key",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status without key": 401
+    },
+    "doc": "Calls without a key are refused"
+  },
+  {
+    "check": "test_wrong_key_refused",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status with wrong key": 401
+    },
+    "doc": "Calls with a wrong key are refused"
+  },
+  {
+    "check": "test_wrong_key_refused",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "assert 200 in (401, 403)\n +  where 200 = <Response [200 OK]>.status_code",
+    "details": {
+      "status with wrong key": 200
+    },
+    "doc": "Calls with a wrong key are refused"
+  },
+  {
+    "check": "test_wrong_key_refused",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status with wrong key": 401
+    },
+    "doc": "Calls with a wrong key are refused"
+  },
+  {
+    "check": "test_per_key_model_restriction",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "how": "virtual key limited to fast-model",
+      "allowed model": 200,
+      "other model": 403
+    },
+    "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
+  },
+  {
+    "check": "test_per_key_model_restriction",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "Failed: no keys or users without the login add-on, so no per-model limits",
+    "details": {},
+    "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
+  },
+  {
+    "check": "test_per_key_model_restriction",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "how": "user with a role that may USE every endpoint except outside-model",
+      "allowed model": 200,
+      "other model": 403
+    },
+    "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
+  },
+  {
+    "check": "test_management_api_locked",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "read model config without key": 401
+    },
+    "doc": "Gateway configuration can't be read or changed without logging in"
+  },
+  {
+    "check": "test_management_api_locked",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "assert (200 in (401, 403))\n +  where 200 = <Response [200 OK]>.status_code",
+    "details": {
+      "list endpoints without login": 200,
+      "create a provider secret without login": 200
+    },
+    "doc": "Gateway configuration can't be read or changed without logging in"
+  },
+  {
+    "check": "test_management_api_locked",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "list endpoints without login": 401,
+      "create a provider secret without login": 401
+    },
+    "doc": "Gateway configuration can't be read or changed without logging in"
+  },
+  {
+    "check": "test_app_credential_cannot_reconfigure",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "add a model with the app key": 403,
+      "create a new key with the app key": 401
+    },
+    "doc": "The app's own (non-admin) credential can't change gateway configuration"
+  },
+  {
+    "check": "test_app_credential_cannot_reconfigure",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "Failed: there is no separate app credential: anyone can change the configuration",
+    "details": {},
+    "doc": "The app's own (non-admin) credential can't change gateway configuration"
+  },
+  {
+    "check": "test_app_credential_cannot_reconfigure",
+    "gateway": "mlflow_login",
+    "outcome": "failed",
+    "message": "AssertionError: any logged-in user can add provider credentials and destinations\nassert 200 in (401, 403)\n +  where 200 = <Response [200 OK]>.status_code",
+    "details": {
+      "create a provider secret as the non-admin app user": 200
+    },
+    "doc": "The app's own (non-admin) credential can't change gateway configuration"
+  },
+  {
+    "check": "test_admin_ui_locked",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "login route says 'Admin UI is Disabled'": true,
+      "empty dashboard page still served at /ui (no login possible)": true
+    },
+    "doc": "The admin UI can be switched off or requires login"
+  },
+  {
+    "check": "test_admin_ui_locked",
+    "gateway": "mlflow",
+    "outcome": "failed",
+    "message": "AssertionError: the MLflow UI (including gateway settings) is open\nassert 200 in (401, 403)\n +  where 200 = <Response [200 OK]>.status_code",
+    "details": {
+      "UI status without login": 200
+    },
+    "doc": "The admin UI can be switched off or requires login"
+  },
+  {
+    "check": "test_admin_ui_locked",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "UI status without login": 401
+    },
+    "doc": "The admin UI can be switched off or requires login"
+  },
+  {
+    "check": "test_image_pinned",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "image": "ghcr.io/berriai/litellm-database:v1.104.0",
+      "litellm_init.pth (March 2026 malware) present": false
+    },
+    "doc": "Runs from an image pinned by digest, with no known malware startup file"
+  },
+  {
+    "check": "test_image_pinned",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "image": "ghcr.io/mlflow/mlflow:v3.17.0",
+      "litellm_init.pth (March 2026 malware) present": false
+    },
+    "doc": "Runs from an image pinned by digest, with no known malware startup file"
+  },
+  {
+    "check": "test_image_pinned",
+    "gateway": "mlflow_login",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "image": "ghcr.io/mlflow/mlflow:v3.17.0-full",
+      "litellm_init.pth (March 2026 malware) present": false
+    },
+    "doc": "Runs from an image pinned by digest, with no known malware startup file"
+  },
+  {
+    "check": "test_overhead",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "one at a time: added p50 (ms)": 9.9,
+      "one at a time: added p95 (ms)": 11.0,
+      "10 at once: added p50 (ms)": 50.0,
+      "10 at once: added p95 (ms)": 66.0,
+      "gateway's own overhead header, p50 (ms)": 4.5
+    },
+    "doc": "Gateway overhead per call (informational)"
+  },
+  {
+    "check": "test_overhead",
+    "gateway": "mlflow",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "one at a time: added p50 (ms)": 12.8,
+      "one at a time: added p95 (ms)": 13.5,
+      "10 at once: added p50 (ms)": 88.5,
+      "10 at once: added p95 (ms)": 188.7,
+      "gateway's own overhead header, p50 (ms)": 9.0
+    },
+    "doc": "Gateway overhead per call (informational)"
+  }
+]

@@ -1,5 +1,6 @@
 {
   "litellm": "ghcr.io/berriai/litellm-database:v1.104.0@sha256:fbe28229d2d02181c0a7d9df9599de614b491f3d897d2d7da18404f088310218",
   "mlflow": "ghcr.io/mlflow/mlflow:v3.17.0@sha256:78803b7afd156eced665b023554bc199a4723d4466e7cba3732f7284f3cddd11",
+  "mlflow_login": "ghcr.io/mlflow/mlflow:v3.17.0-full@sha256:2b86b1151296dd4639729ac699a6db783e753aed31f69be91134476aa66cb2a0",
   "postgres": "postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea"
 }
