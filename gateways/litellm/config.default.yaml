@@ -1,0 +1,33 @@
+# LiteLLM Proxy, "default" profile: the same models with out-of-the-box logging settings
+# (only a master key added). Used to see what LiteLLM stores when nothing is hardened.
+# ${...} placeholders are filled in by scripts/run_eval.py at start-up.
+
+model_list:
+  - model_name: fast-model
+    litellm_params: {model: openai/fast-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: smart-model
+    litellm_params: {model: openai/smart-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: gpt-4o-mini
+    litellm_params: {model: openai/gpt-4o-mini, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: embed-model
+    litellm_params: {model: openai/embed-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: eu-chat
+    litellm_params: {model: openai/broken-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: eu-backup
+    litellm_params: {model: openai/backup-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: outside-model
+    litellm_params: {model: openai/outside-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+
+router_settings:
+  fallbacks:
+    - eu-chat: [eu-backup]
+  num_retries: 0
+
+litellm_settings:
+  num_retries: 0
+  request_timeout: 30
+  telemetry: false
+
+general_settings:
+  master_key: "${MASTER_KEY}"
+  proxy_batch_write_at: 2

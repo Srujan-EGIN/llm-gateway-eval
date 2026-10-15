@@ -17,6 +17,7 @@ Host ports (127.0.0.1 only):
 import base64
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -25,7 +26,6 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
-import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 RUN_DIR = ROOT / "runs" / datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -92,97 +92,44 @@ def wait_http(url: str, timeout: float = 240, headers: dict | None = None) -> No
     raise RuntimeError(f"timed out waiting for {url}")
 
 
+# ---------------------------------------------------------------- gateway configs
+GATEWAYS_DIR = ROOT / "gateways"
+
+
+def render(template: Path, out: Path, **values: str) -> Path:
+    """Copy a config from gateways/ into the run folder, filling in ${NAME} placeholders."""
+    text = template.read_text(encoding="utf-8")
+    for k, v in values.items():
+        text = text.replace("${" + k + "}", v)
+    left = re.findall(r"\$\{[A-Z_]+\}", text)
+    assert not left, f"unfilled placeholder(s) {left} in {template}"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    return out
+
+
 # ---------------------------------------------------------------- LiteLLM
-def litellm_config(hardened: bool) -> dict:
-    def dep(group: str, model: str) -> dict:
-        return {"model_name": group,
-                "litellm_params": {"model": f"openai/{model}", "api_base": f"{MOCK_IN_NET}/v1",
-                                   "api_key": "fake-key"}}
-
-    cfg = {
-        "model_list": [
-            dep("fast-model", "fast-model"),
-            dep("smart-model", "smart-model"),
-            dep("gpt-4o-mini", "gpt-4o-mini"),
-            dep("embed-model", "embed-model"),
-            # "eu-chat": primary is broken, the EU backup must take over.
-            dep("eu-chat", "broken-model"),
-            dep("eu-backup", "backup-model"),
-            # Exists in the gateway but is NOT an allowed fallback for eu-chat.
-            dep("outside-model", "outside-model"),
-        ],
-        "router_settings": {"fallbacks": [{"eu-chat": ["eu-backup"]}], "num_retries": 0},
-        "litellm_settings": {"num_retries": 0, "request_timeout": 30, "telemetry": False},
-        "general_settings": {"master_key": MASTER_KEY, "proxy_batch_write_at": 2},
-    }
-    if hardened:
-        cfg["litellm_settings"]["turn_off_message_logging"] = True
-        cfg["general_settings"]["store_prompts_in_spend_logs"] = False
-    return cfg
-
-
 def start_litellm(profile: str, port: int) -> None:
-    d = RUN_DIR / f"litellm-{profile}"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "config.yaml").write_text(yaml.safe_dump(litellm_config(profile == "hardened"),
-                                                  sort_keys=False))
+    cfg = render(GATEWAYS_DIR / "litellm" / f"config.{profile}.yaml",
+                 RUN_DIR / f"litellm-{profile}" / "config.yaml",
+                 MOCK_URL=MOCK_IN_NET, MASTER_KEY=MASTER_KEY)
     env = {"DATABASE_URL": f"postgresql://postgres:{PG_PASSWORD}@gweval-pg:5432/litellm_{profile}"}
     if profile == "hardened":
         env["DISABLE_ADMIN_UI"] = "True"
     run_container(f"litellm-{profile}", IMAGES["litellm"],
                   ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"],
                   ports=[f"{port}:4000"], env=env,
-                  mounts=[f"{(d / 'config.yaml').resolve()}:/app/config.yaml:ro"])
+                  mounts=[f"{cfg.resolve()}:/app/config.yaml:ro"])
 
 
 # ---------------------------------------------------------------- Bifrost
-def bifrost_config(hardened: bool) -> dict:
-    """Same models and fallback rule as LiteLLM. Login and keys are on in both profiles."""
-    return {
-        "auth_config": {"is_enabled": True, "admin_username": BIFROST_ADMIN[0],
-                        "admin_password": BIFROST_ADMIN[1]},
-        "client": {
-            "enable_logging": True,
-            # The No-Retention switch. Default (off) stores prompts and responses in logs.db.
-            "disable_content_logging": hardened,
-            "enforce_auth_on_inference": True,
-            "allow_direct_keys": False,
-        },
-        "providers": {"openai": {
-            "keys": [{"name": "mock", "value": "fake-key", "models": ["*"], "weight": 1}],
-            "network_config": {"base_url": MOCK_IN_NET, "allow_private_network": True,
-                               "max_retries": 0},
-        }},
-        "governance": {
-            "virtual_keys": [
-                {"id": "vk-app", "name": "app", "value": BIFROST_APP_KEY, "is_active": True,
-                 "provider_configs": [{"provider": "openai", "allowed_models": ["*"],
-                                       "weight": 1, "key_ids": ["*"]}]},
-                {"id": "vk-limited", "name": "eu-mode", "value": BIFROST_LIMITED_KEY,
-                 "is_active": True,
-                 "provider_configs": [{"provider": "openai", "allowed_models": ["fast-model"],
-                                       "weight": 1, "key_ids": ["*"]}]},
-            ],
-            # "eu-chat": primary is broken, the backup must take over; outside-model never.
-            "routing_rules": [{
-                "id": "eu-chat", "name": "eu-chat", "enabled": True,
-                "cel_expression": "model == 'eu-chat'", "scope": "global", "priority": 0,
-                "targets": [{"provider": "openai", "model": "broken-model", "weight": 1}],
-                "fallbacks": ["openai/backup-model"],
-            }],
-        },
-        "config_store": {"enabled": True, "type": "sqlite",
-                         "config": {"path": "/app/data/config.db"}},
-        "logs_store": {"enabled": True, "type": "sqlite", "config": {"path": "/app/data/logs.db"}},
-    }
-
-
 def start_bifrost(profile: str, port: int) -> None:
-    d = RUN_DIR / f"bifrost-{profile}"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / "config.json").write_text(json.dumps(bifrost_config(profile == "hardened"), indent=2))
+    cfg = render(GATEWAYS_DIR / "bifrost" / f"config.{profile}.json",
+                 RUN_DIR / f"bifrost-{profile}" / "config.json",
+                 MOCK_URL=MOCK_IN_NET, BIFROST_ADMIN_PASSWORD=BIFROST_ADMIN[1],
+                 BIFROST_APP_KEY=BIFROST_APP_KEY, BIFROST_LIMITED_KEY=BIFROST_LIMITED_KEY)
     run_container(f"bifrost-{profile}", IMAGES["bifrost"], [], ports=[f"{port}:8080"],
-                  mounts=[f"{(d / 'config.json').resolve()}:/app/data/config.json:ro"])
+                  mounts=[f"{cfg.resolve()}:/app/data/config.json:ro"])
 
 
 # ---------------------------------------------------------------- MLflow
@@ -213,69 +160,11 @@ def start_mlflow(name: str = "mlflow", port: int = 5000, login: bool = False) ->
 
 
 def provision_mlflow(url: str = "http://127.0.0.1:5000", login: bool = False) -> None:
-    """Create MLflow gateway endpoints equivalent to the LiteLLM config."""
-    if login:
-        os.environ["MLFLOW_TRACKING_USERNAME"], os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_ADMIN
-    from mlflow.entities.gateway_endpoint import (FallbackConfig, FallbackStrategy,
-                                                  GatewayEndpointModelConfig,
-                                                  GatewayModelLinkageType)
-    from mlflow.tracking._tracking_service.utils import _get_store
-
-    store = _get_store(url)
-    secret = store.create_gateway_secret(
-        secret_name="mock-key", secret_value={"api_key": "fake-key"}, provider="openai",
-        auth_config={"api_base": f"{MOCK_IN_NET}/v1"})
-
-    defs = {}
-    for m in ["fast-model", "smart-model", "gpt-4o-mini", "embed-model", "broken-model",
-              "backup-model", "outside-model"]:
-        defs[m] = store.create_gateway_model_definition(
-            name=f"def-{m}", secret_id=secret.secret_id, provider="openai",
-            model_name=m).model_definition_id
-
-    def endpoint(name, model, tracking, fallback=None):
-        configs = [GatewayEndpointModelConfig(model_definition_id=defs[model],
-                                              linkage_type=GatewayModelLinkageType.PRIMARY)]
-        kw = {}
-        if fallback:
-            configs.append(GatewayEndpointModelConfig(
-                model_definition_id=defs[fallback], linkage_type=GatewayModelLinkageType.FALLBACK,
-                fallback_order=0))
-            kw["fallback_config"] = FallbackConfig(strategy=FallbackStrategy.SEQUENTIAL,
-                                                   max_attempts=2)
-        store.create_gateway_endpoint(name=name, model_configs=configs,
-                                      usage_tracking=tracking, **kw)
-
-    # "hardened" profile = usage tracking (request traces) switched off
-    for m in ["fast-model", "smart-model", "gpt-4o-mini", "embed-model", "outside-model"]:
-        endpoint(m, m, tracking=False)
-    endpoint("eu-chat", "broken-model", tracking=False, fallback="backup-model")
-    # "default" profile = MLflow's default (usage tracking on)
-    endpoint("fast-model-default", "fast-model", tracking=True)
-    endpoint("gpt-4o-mini-default", "gpt-4o-mini", tracking=True)
-
-    if login:
-        _mlflow_limited_user(url, store)
-        del os.environ["MLFLOW_TRACKING_USERNAME"], os.environ["MLFLOW_TRACKING_PASSWORD"]
-
-
-def _mlflow_limited_user(url: str, store) -> None:
-    """A non-admin user that may USE every endpoint except outside-model (like a per-mode key)."""
-    def post(path, body):
-        r = httpx.post(url + path, json=body, auth=MLFLOW_ADMIN, timeout=30)
-        r.raise_for_status()
-        return r.json()
-
-    post("/api/2.0/mlflow/users/create",
-         {"username": MLFLOW_APP_USER[0], "password": MLFLOW_APP_USER[1]})
-    role_id = post("/api/3.0/mlflow/roles/create",
-                   {"name": "eu-mode", "workspace": "default"})["role"]["id"]
-    for name in ["fast-model", "smart-model", "gpt-4o-mini", "embed-model", "eu-chat"]:
-        ep = store.get_gateway_endpoint(name=name)
-        post("/api/3.0/mlflow/roles/permissions/add",
-             {"role_id": role_id, "resource_type": "gateway_endpoint",
-              "resource_pattern": ep.endpoint_id, "permission": "USE"})
-    post("/api/3.0/mlflow/roles/assign", {"username": MLFLOW_APP_USER[0], "role_id": role_id})
+    """MLflow is configured through its API: see gateways/mlflow/endpoints.yaml."""
+    sys.path.insert(0, str(GATEWAYS_DIR / "mlflow"))
+    from provision import provision
+    provision(url, MOCK_IN_NET, admin=MLFLOW_ADMIN if login else None,
+              app_user=MLFLOW_APP_USER if login else None)
 
 
 # ---------------------------------------------------------------- main

@@ -1,6 +1,6 @@
 # Results: LiteLLM Proxy vs Bifrost vs MLflow AI Gateway
 
-Generated 2026-10-15 16:06 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
+Generated 2026-10-15 16:17 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
 
 | | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
 |---|---|---|---|---|
@@ -53,7 +53,7 @@ Generated 2026-10-15 16:06 by `scripts/run_eval.py`. Every row is an automated t
 
 | Check | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
 |---|---|---|---|---|
-| Gateway overhead per call (informational) | ℹ️ one at a time: added p50 (ms): 9.3; one at a time: added p95 (ms): 10.5; 10 at once: added p50 (ms): 53.3; 10 at once: added p95 (ms): 75.1; gateway's own overhead header, p50 (ms): 4.3 | ℹ️ one at a time: added p50 (ms): 1.6; one at a time: added p95 (ms): 1.7; 10 at once: added p50 (ms): 2.4; 10 at once: added p95 (ms): 3.0 | ℹ️ one at a time: added p50 (ms): 11.9; one at a time: added p95 (ms): 14.3; 10 at once: added p50 (ms): 91.6; 10 at once: added p95 (ms): 182.9; gateway's own overhead header, p50 (ms): 9.0 | – |
+| Gateway overhead per call (informational) | ℹ️ one at a time: added p50 (ms): 9.2; one at a time: added p95 (ms): 10.5; 10 at once: added p50 (ms): 63.2; 10 at once: added p95 (ms): 99.5; gateway's own overhead header, p50 (ms): 4.3 | ℹ️ one at a time: added p50 (ms): 1.8; one at a time: added p95 (ms): 2.3; 10 at once: added p50 (ms): 2.2; 10 at once: added p95 (ms): 3.1 | ℹ️ one at a time: added p50 (ms): 14.6; one at a time: added p95 (ms): 18.4; 10 at once: added p50 (ms): 114.3; 10 at once: added p95 (ms): 253.5; gateway's own overhead header, p50 (ms): 11.0 | – |
 
 ## How to read this
 

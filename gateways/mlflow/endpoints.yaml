@@ -1,0 +1,28 @@
+# MLflow AI Gateway: endpoints created through MLflow's API at start-up (gateways/mlflow/provision.py).
+# MLflow has no config file for its gateway; this file describes the same setup as the LiteLLM
+# and Bifrost configs, so every gateway serves the same models with the same fallback rule.
+
+provider:
+  name: openai             # the fake provider speaks the OpenAI API
+  api_base: "${MOCK_URL}/v1"
+
+models: [fast-model, smart-model, gpt-4o-mini, embed-model, broken-model, backup-model, outside-model]
+
+endpoints:
+  # "hardened" profile: usage tracking (request traces) off, so no prompt text is stored.
+  - {name: fast-model,    model: fast-model,    usage_tracking: false}
+  - {name: smart-model,   model: smart-model,   usage_tracking: false}
+  - {name: gpt-4o-mini,   model: gpt-4o-mini,   usage_tracking: false}
+  - {name: embed-model,   model: embed-model,   usage_tracking: false}
+  - {name: outside-model, model: outside-model, usage_tracking: false}
+  # "eu-chat": the primary is broken on purpose; backup-model must take over.
+  - {name: eu-chat,       model: broken-model,  usage_tracking: false, fallback: backup-model}
+  # "default" profile: MLflow's default (usage tracking on, so traces store prompts).
+  - {name: fast-model-default,  model: fast-model,  usage_tracking: true}
+  - {name: gpt-4o-mini-default, model: gpt-4o-mini, usage_tracking: true}
+
+# Only on the second server with the login add-on (--app-name basic-auth):
+# a non-admin user whose role may USE these endpoints and nothing else (like a per-mode key).
+limited_user:
+  role: eu-mode
+  may_use: [fast-model, smart-model, gpt-4o-mini, embed-model, eu-chat]

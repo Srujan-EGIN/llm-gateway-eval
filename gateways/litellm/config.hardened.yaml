@@ -1,0 +1,37 @@
+# LiteLLM Proxy, "hardened" profile: the recommended production settings.
+# ${...} placeholders are filled in by scripts/run_eval.py at start-up (keys are random per run).
+# Also set on the container: DISABLE_ADMIN_UI=True, DATABASE_URL=<Postgres>.
+
+model_list:
+  - model_name: fast-model
+    litellm_params: {model: openai/fast-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: smart-model
+    litellm_params: {model: openai/smart-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: gpt-4o-mini
+    litellm_params: {model: openai/gpt-4o-mini, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: embed-model
+    litellm_params: {model: openai/embed-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  # "eu-chat": the primary is broken on purpose; the EU backup must take over.
+  - model_name: eu-chat
+    litellm_params: {model: openai/broken-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: eu-backup
+    litellm_params: {model: openai/backup-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  # Exists in the gateway but is NOT an allowed fallback for eu-chat.
+  - model_name: outside-model
+    litellm_params: {model: openai/outside-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+
+router_settings:
+  fallbacks:
+    - eu-chat: [eu-backup]
+  num_retries: 0
+
+litellm_settings:
+  num_retries: 0
+  request_timeout: 30
+  telemetry: false
+  turn_off_message_logging: true        # No-Retention: never log prompt or response text
+
+general_settings:
+  master_key: "${MASTER_KEY}"
+  proxy_batch_write_at: 2
+  store_prompts_in_spend_logs: false    # usage/cost rows are kept, prompt text is not

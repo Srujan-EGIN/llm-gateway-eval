@@ -39,18 +39,37 @@ A hands-on test lab that runs **LiteLLM Proxy**, **Bifrost** and **MLflow AI Gat
 
 ## How it works
 
-```
-                  ┌─────────────────────────── Docker network ────────────────────────────┐
-  tests (pytest) ─┼─► LiteLLM Proxy (hardened / default) ─┐                                │
-                  │   Bifrost       (hardened / default) ─┼─► fake model provider          │
-                  │   MLflow AI Gateway                  ─┤   • fast-model, backup-model … │
-                  │   MLflow + login add-on              ─┘   • broken-model (always fails)│
-                  │   Postgres (LiteLLM's database)            • records every call        │
-                  └────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    T["Test suite<br/>(pytest, tests/)"]
+
+    subgraph NET["Docker network"]
+        direction LR
+        subgraph GW["LLM gateways under test (gateways/)"]
+            L1["LiteLLM Proxy<br/>hardened :4000"]
+            L2["LiteLLM Proxy<br/>default :4001"]
+            B1["Bifrost<br/>hardened :4002"]
+            B2["Bifrost<br/>default :4003"]
+            M1["MLflow AI Gateway<br/>:5000"]
+            M2["MLflow + login add-on<br/>:5001"]
+        end
+        PG[("Postgres<br/>LiteLLM keys and usage")]
+        P["Fake model provider<br/>(mock_provider/)<br/>fast-model, backup-model,<br/>broken-model (always fails),<br/>outside-model (never allowed)"]
+    end
+
+    R["results/REPORT.md<br/>verdict per gateway"]
+
+    T -->|"chat, streaming, tools,<br/>keys, fallback"| GW
+    L1 --> PG
+    L2 --> PG
+    GW -->|"forwards requests"| P
+    T -.->|"which model really served?"| P
+    T -.->|"search logs, databases, files<br/>for the prompt"| GW
+    T --> R
 ```
 
 - **Fake provider** ([`mock_provider/server.py`](mock_provider/server.py)): an OpenAI-compatible stand-in for Bedrock, Azure or an on-prem model server. It's free and predictable, and it records which model really served each request.
-- **Same setup for every gateway** ([`scripts/run_eval.py`](scripts/run_eval.py)): the same models, the same fallback rule (`eu-chat`: broken primary → `backup-model`; `outside-model` is never allowed), and the same hardened settings.
+- **Gateways** ([`gateways/`](gateways)): one folder per gateway with its real configuration. All get the same setup: the same models, the same fallback rule (`eu-chat`: broken primary → `backup-model`; `outside-model` is never allowed), and the same hardened settings.
 - **No-Retention test:** a unique marker phrase goes into the prompt. Then every container log, the database and every data file is searched byte by byte for it.
 - **Speed test:** the timing client runs inside the Docker network ([`scripts/latency_probe.py`](scripts/latency_probe.py)) and alternates direct and gateway calls, so host networking doesn't skew the numbers.
 - **Report** ([`scripts/make_report.py`](scripts/make_report.py)): built automatically from the test results.
