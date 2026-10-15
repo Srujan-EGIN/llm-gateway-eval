@@ -1,4 +1,4 @@
-"""Start everything in Docker, run the test suite against both gateways, write the report.
+"""Start everything in Docker, run the test suite against every gateway, write the report.
 
     uv run python scripts/run_eval.py              # full run
     uv run python scripts/run_eval.py --setup-only # start + provision, run no tests
@@ -8,7 +8,10 @@ Host ports (127.0.0.1 only):
   9100  mock provider (fake OpenAI-compatible models)
   4000  LiteLLM Proxy, "hardened" profile (recommended production settings) + Postgres
   4001  LiteLLM Proxy, "default" profile (out-of-the-box settings) + Postgres
+  4002  Bifrost, "hardened" profile
+  4003  Bifrost, "default" profile
   5000  MLflow server with its AI Gateway (both profiles are endpoints on one server)
+  5001  MLflow with its optional login add-on (security tests only)
 """
 
 import base64
@@ -35,6 +38,9 @@ IMAGES = json.loads((ROOT / "images.json").read_text())
 NET = "gweval"
 PREFIX = "gweval-"
 MASTER_KEY = "sk-" + secrets.token_hex(16)
+BIFROST_ADMIN = ("admin", "Bf-" + secrets.token_hex(12))
+BIFROST_APP_KEY = "sk-bf-" + secrets.token_hex(16)      # virtual key: all models
+BIFROST_LIMITED_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: fast-model only
 PG_PASSWORD = secrets.token_hex(8)
 MOCK_IN_NET = "http://gweval-mock:9100"  # how gateways reach the provider
 MOCK_FROM_HOST = "http://127.0.0.1:9100"  # how tests reach it directly (latency baseline)
@@ -127,6 +133,56 @@ def start_litellm(profile: str, port: int) -> None:
                   ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"],
                   ports=[f"{port}:4000"], env=env,
                   mounts=[f"{(d / 'config.yaml').resolve()}:/app/config.yaml:ro"])
+
+
+# ---------------------------------------------------------------- Bifrost
+def bifrost_config(hardened: bool) -> dict:
+    """Same models and fallback rule as LiteLLM. Login and keys are on in both profiles."""
+    return {
+        "auth_config": {"is_enabled": True, "admin_username": BIFROST_ADMIN[0],
+                        "admin_password": BIFROST_ADMIN[1]},
+        "client": {
+            "enable_logging": True,
+            # The No-Retention switch. Default (off) stores prompts and responses in logs.db.
+            "disable_content_logging": hardened,
+            "enforce_auth_on_inference": True,
+            "allow_direct_keys": False,
+        },
+        "providers": {"openai": {
+            "keys": [{"name": "mock", "value": "fake-key", "models": ["*"], "weight": 1}],
+            "network_config": {"base_url": MOCK_IN_NET, "allow_private_network": True,
+                               "max_retries": 0},
+        }},
+        "governance": {
+            "virtual_keys": [
+                {"id": "vk-app", "name": "app", "value": BIFROST_APP_KEY, "is_active": True,
+                 "provider_configs": [{"provider": "openai", "allowed_models": ["*"],
+                                       "weight": 1, "key_ids": ["*"]}]},
+                {"id": "vk-limited", "name": "eu-mode", "value": BIFROST_LIMITED_KEY,
+                 "is_active": True,
+                 "provider_configs": [{"provider": "openai", "allowed_models": ["fast-model"],
+                                       "weight": 1, "key_ids": ["*"]}]},
+            ],
+            # "eu-chat": primary is broken, the backup must take over; outside-model never.
+            "routing_rules": [{
+                "id": "eu-chat", "name": "eu-chat", "enabled": True,
+                "cel_expression": "model == 'eu-chat'", "scope": "global", "priority": 0,
+                "targets": [{"provider": "openai", "model": "broken-model", "weight": 1}],
+                "fallbacks": ["openai/backup-model"],
+            }],
+        },
+        "config_store": {"enabled": True, "type": "sqlite",
+                         "config": {"path": "/app/data/config.db"}},
+        "logs_store": {"enabled": True, "type": "sqlite", "config": {"path": "/app/data/logs.db"}},
+    }
+
+
+def start_bifrost(profile: str, port: int) -> None:
+    d = RUN_DIR / f"bifrost-{profile}"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "config.json").write_text(json.dumps(bifrost_config(profile == "hardened"), indent=2))
+    run_container(f"bifrost-{profile}", IMAGES["bifrost"], [], ports=[f"{port}:8080"],
+                  mounts=[f"{(d / 'config.json').resolve()}:/app/data/config.json:ro"])
 
 
 # ---------------------------------------------------------------- MLflow
@@ -255,6 +311,26 @@ def targets() -> dict:
                               {**pg, "db": "litellm_default"}],
                 },
             },
+            "bifrost": {
+                "base_url": "http://127.0.0.1:4002/v1",
+                "root_url": "http://127.0.0.1:4002",
+                "embeddings_url": "http://127.0.0.1:4002/v1",
+                "api_key": BIFROST_APP_KEY,
+                "auth_header": f"Bearer {BIFROST_APP_KEY}",
+                "limited_key": BIFROST_LIMITED_KEY,
+                "admin": list(BIFROST_ADMIN),
+                "sinks": [{"type": "logs", "container": PREFIX + "bifrost-hardened"},
+                          {"type": "dir", "container": PREFIX + "bifrost-hardened",
+                           "path": "/app/data", "scanner": "grep"}],
+                "default_profile": {
+                    "base_url": "http://127.0.0.1:4003/v1", "api_key": BIFROST_APP_KEY,
+                    "root_url": "http://127.0.0.1:4003", "admin": list(BIFROST_ADMIN),
+                    "chat_model": "fast-model", "cost_model": "gpt-4o-mini",
+                    "sinks": [{"type": "logs", "container": PREFIX + "bifrost-default"},
+                              {"type": "dir", "container": PREFIX + "bifrost-default",
+                               "path": "/app/data", "scanner": "grep"}],
+                },
+            },
             "mlflow": {
                 "base_url": "http://127.0.0.1:5000/gateway/mlflow/v1",
                 "root_url": "http://127.0.0.1:5000",
@@ -276,7 +352,8 @@ def targets() -> dict:
 
 
 def save_logs() -> None:
-    for c in ["mock", "pg", "litellm-hardened", "litellm-default", "mlflow", "mlflow-login"]:
+    for c in ["mock", "pg", "litellm-hardened", "litellm-default", "bifrost-hardened",
+              "bifrost-default", "mlflow", "mlflow-login"]:
         out = docker("logs", PREFIX + c, check=False)
         (RUN_DIR / f"{c}.log").write_text((out.stdout or "") + (out.stderr or ""),
                                           encoding="utf-8")
@@ -316,6 +393,8 @@ def main() -> int:
 
         start_litellm("hardened", 4000)
         start_litellm("default", 4001)
+        start_bifrost("hardened", 4002)
+        start_bifrost("default", 4003)
         start_mlflow()
         start_mlflow("mlflow-login", 5001, login=True)
 
@@ -323,6 +402,8 @@ def main() -> int:
         auth = {"Authorization": f"Bearer {MASTER_KEY}"}
         for port in (4000, 4001):
             wait_http(f"http://127.0.0.1:{port}/health/liveliness", timeout=300, headers=auth)
+        for port in (4002, 4003):
+            wait_http(f"http://127.0.0.1:{port}/health", timeout=300)
         wait_http("http://127.0.0.1:5000/health", timeout=300)
         wait_http("http://127.0.0.1:5001/health", timeout=300)
         log("all services up; provisioning MLflow endpoints")

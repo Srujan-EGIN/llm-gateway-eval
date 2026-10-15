@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Same in-network names as scripts/run_eval.py
 IN_NET = {
     "litellm": "http://gweval-litellm-hardened:4000/v1/chat/completions",
+    "bifrost": "http://gweval-bifrost-hardened:8080/v1/chat/completions",
     "mlflow": "http://gweval-mlflow:5000/gateway/mlflow/v1/chat/completions",
 }
 

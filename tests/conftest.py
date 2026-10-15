@@ -104,6 +104,10 @@ def find_in_sinks(sinks: list[dict], needle: str) -> list[str]:
                 elif needle in line:
                     found.add(table)
             hits += [f"Postgres table {t}" for t in sorted(found)]
+        elif s["type"] == "dir" and s.get("scanner") == "grep":  # images without Python
+            out = _run(["docker", "exec", s["container"], "grep", "-rlF", needle, s["path"]])
+            hits += [f"file {line.strip()}" for line in out.splitlines()
+                     if line.startswith(s["path"])]
         elif s["type"] == "dir":
             out = _run(["docker", "exec", s["container"], "python", "-c", _SCAN, s["path"], needle])
             hits += [f"file {line[4:]}" for line in out.splitlines() if line.startswith("HIT ")]

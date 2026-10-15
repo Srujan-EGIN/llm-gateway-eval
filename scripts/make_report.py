@@ -9,8 +9,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-GATEWAYS = ["litellm", "mlflow", "mlflow_login"]
-TITLES = {"litellm": "LiteLLM Proxy", "mlflow": "MLflow AI Gateway",
+GATEWAYS = ["litellm", "bifrost", "mlflow", "mlflow_login"]
+TITLES = {"litellm": "LiteLLM Proxy", "bifrost": "Bifrost", "mlflow": "MLflow AI Gateway",
           "mlflow_login": "MLflow + login add-on¹"}
 
 # check name -> section. Order here is the order in the report.
@@ -58,7 +58,7 @@ def main(run_dir: Path) -> None:
         score[g] = (sum(r["outcome"] == "passed" for r in graded), len(graded))
 
     out = [
-        "# Results: LiteLLM Proxy vs MLflow AI Gateway",
+        "# Results: LiteLLM Proxy vs Bifrost vs MLflow AI Gateway",
         "",
         f"Generated {datetime.now():%Y-%m-%d %H:%M} by `scripts/run_eval.py`. "
         "Every row is an automated test in [`tests/`](../tests).",
@@ -91,7 +91,8 @@ def main(run_dir: Path) -> None:
         "## How to read this",
         "",
         "- **Hardened** means each gateway's recommended production settings: LiteLLM with "
-        "`turn_off_message_logging`, MLflow endpoints with usage tracking (request traces) off. "
+        "`turn_off_message_logging`, Bifrost with `disable_content_logging`, MLflow endpoints with "
+        "usage tracking (request traces) off. "
         "**Default** means the out-of-the-box settings.",
         "- The provider is a **fake model** (`mock_provider/`) that answers in ~100 ms, so tests are "
         "free and repeatable. Real Bedrock was not called in this run.",

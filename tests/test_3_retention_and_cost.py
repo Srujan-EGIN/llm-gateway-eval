@@ -11,6 +11,7 @@ Profiles (see scripts/run_eval.py):
 
 import json
 import subprocess
+import time
 
 import httpx
 import pytest
@@ -88,6 +89,20 @@ def _cost_for(gw, base_url, api_key, model):
     r.raise_for_status()
     if gw["name"] == "litellm":
         return float(r.headers.get("x-litellm-response-cost") or 0) or None
+    if gw["name"] == "bifrost":
+        # Cost lives in Bifrost's request log (written asynchronously); the log id is the
+        # response's x-request-id. Poll for that exact entry.
+        root, req_id = base_url.rsplit("/v1", 1)[0], r.headers.get("x-request-id")
+        for _ in range(20):
+            time.sleep(1)
+            logs = httpx.get(root + "/api/logs", auth=tuple(gw["admin"]), timeout=30,
+                             params={"models": model, "limit": 20, "sort_by": "timestamp",
+                                     "order": "desc"}).json()["logs"]
+            row = next((l for l in logs if l["id"] == req_id), None)
+            if row and row.get("cost"):
+                return row["cost"]
+        print(f"bifrost cost lookup: request {req_id} log row = {row}")  # shown on failure
+        return None
     wait_for_async_writes(5)
     return _mlflow_latest_trace_cost(f"gateway/{model}")
 

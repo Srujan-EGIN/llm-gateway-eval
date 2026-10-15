@@ -13,7 +13,7 @@ import subprocess
 import httpx
 import pytest
 
-from conftest import TARGETS
+from conftest import TARGETS, mock_calls, reset_mock
 
 MSG = [{"role": "user", "content": "hi"}]
 OWN_GW = True
@@ -57,13 +57,21 @@ def test_per_key_model_restriction(gw, note):
         r.raise_for_status()
         auth = f"Bearer {r.json()['key']}"
         note("how", "virtual key limited to fast-model")
+    elif gw["name"] == "bifrost":
+        auth = f"Bearer {gw['limited_key']}"
+        note("how", "virtual key limited to fast-model (from config)")
     else:
         auth = gw["auth_header"]
         note("how", "user with a role that may USE every endpoint except outside-model")
+    reset_mock()
     allowed, blocked = _chat(gw, auth, "fast-model"), _chat(gw, auth, "outside-model")
+    reached_provider = "outside-model" in {c["model"] for c in mock_calls()}
     note("allowed model", allowed.status_code)
     note("other model", blocked.status_code)
-    assert allowed.status_code == 200 and blocked.status_code in (401, 403)
+    note("other model reached the provider", reached_provider)
+    # Blocked = refused with a 4xx AND never forwarded (status codes differ per gateway)
+    assert allowed.status_code == 200
+    assert 400 <= blocked.status_code < 500 and not reached_provider
 
 
 def test_management_api_locked(gw, note):
@@ -72,6 +80,14 @@ def test_management_api_locked(gw, note):
         r = httpx.get(gw["root_url"] + "/model/info", timeout=30)
         note("read model config without key", r.status_code)
         assert r.status_code in (401, 403)
+        return
+    if gw["name"] == "bifrost":
+        listed = httpx.get(gw["root_url"] + "/api/providers", timeout=30)
+        changed = httpx.post(gw["root_url"] + "/api/providers", timeout=30,
+                             json={"provider": "anthropic", "keys": [{"value": "x"}]})
+        note("list providers without login", listed.status_code)
+        note("add a provider without login", changed.status_code)
+        assert listed.status_code in (401, 403) and changed.status_code in (401, 403)
         return
     list_url = gw["root_url"] + "/ajax-api/3.0/mlflow/gateway/endpoints/list"
     create_url = gw["root_url"] + "/ajax-api/3.0/mlflow/gateway/secrets/create"
@@ -101,6 +117,16 @@ def test_app_credential_cannot_reconfigure(gw, note):
         note("add a model with the app key", add_model.status_code)
         note("create a new key with the app key", new_key.status_code)
         assert add_model.status_code in (401, 403) and new_key.status_code in (401, 403)
+    elif gw["name"] == "bifrost":
+        app = {"Authorization": gw["auth_header"]}
+        add = httpx.post(gw["root_url"] + "/api/providers", headers=app, timeout=30,
+                         json={"provider": "anthropic", "keys": [{"value": "x"}],
+                               "network_config": {"base_url": "https://attacker.example"}})
+        vk = httpx.post(gw["root_url"] + "/api/governance/virtual-keys", headers=app,
+                        timeout=30, json={"name": "rogue"})
+        note("add a provider with the app's virtual key", add.status_code)
+        note("create a virtual key with the app's virtual key", vk.status_code)
+        assert add.status_code in (401, 403) and vk.status_code in (401, 403)
     else:
         app = {"Authorization": gw["auth_header"]}
         create = httpx.post(gw["root_url"] + "/ajax-api/3.0/mlflow/gateway/secrets/create",
@@ -122,6 +148,12 @@ def test_admin_ui_locked(gw, note):
         ui = httpx.get(gw["root_url"] + "/ui/", timeout=30, follow_redirects=True)
         note("empty dashboard page still served at /ui (no login possible)", ui.status_code == 200)
         assert disabled
+    elif gw["name"] == "bifrost":
+        api = httpx.get(gw["root_url"] + "/api/config", timeout=30)
+        ui = httpx.get(gw["root_url"] + "/", timeout=30)
+        note("admin API without login", api.status_code)
+        note("empty UI page still served at / (login required for data)", ui.status_code == 200)
+        assert api.status_code in (401, 403)
     else:
         r = httpx.get(gw["root_url"] + "/", timeout=30)
         note("UI status without login", r.status_code)
@@ -141,9 +173,13 @@ def test_image_pinned(gw, note):
     scan = ("import site,glob,os,json;"
             "print(json.dumps(sorted({os.path.basename(p) for d in site.getsitepackages() "
             "for p in glob.glob(os.path.join(d,'*.pth'))})))")
-    out = subprocess.run(["docker", "exec", _container(gw), "python", "-c", scan],
-                         capture_output=True, text=True).stdout.strip()
-    pth = json.loads(out or "[]")
-    note("litellm_init.pth (March 2026 malware) present", "litellm_init.pth" in pth)
+    if gw["name"] == "bifrost":
+        pth = []  # a single Go binary: no Python packages that could carry .pth files
+        note("Python startup files", "n/a (Go binary)")
+    else:
+        out = subprocess.run(["docker", "exec", _container(gw), "python", "-c", scan],
+                             capture_output=True, text=True).stdout.strip()
+        pth = json.loads(out or "[]")
+        note("litellm_init.pth (March 2026 malware) present", "litellm_init.pth" in pth)
     assert running == expected and "@sha256:" in running
     assert "litellm_init.pth" not in pth

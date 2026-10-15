@@ -11,6 +11,16 @@
   },
   {
     "check": "test_chat",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tokens reported": 7
+    },
+    "doc": "Chat completion works"
+  },
+  {
+    "check": "test_chat",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -31,6 +41,16 @@
   },
   {
     "check": "test_streaming",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "chunks": 4
+    },
+    "doc": "Streaming works"
+  },
+  {
+    "check": "test_streaming",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -51,6 +71,16 @@
   },
   {
     "check": "test_tool_calling",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tool called": "get_weather"
+    },
+    "doc": "Tool calling works"
+  },
+  {
+    "check": "test_tool_calling",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -62,6 +92,16 @@
   {
     "check": "test_embeddings",
     "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "vectors": 2
+    },
+    "doc": "Embeddings work"
+  },
+  {
+    "check": "test_embeddings",
+    "gateway": "bifrost",
     "outcome": "passed",
     "message": "",
     "details": {
@@ -91,6 +131,16 @@
   },
   {
     "check": "test_unknown_model_rejected",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status": 400
+    },
+    "doc": "Unknown model names are refused"
+  },
+  {
+    "check": "test_unknown_model_rejected",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -111,6 +161,16 @@
   },
   {
     "check": "test_fallback_used",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "broken-model -> backup-model"
+    },
+    "doc": "Falls back to the backup when the main model fails"
+  },
+  {
+    "check": "test_fallback_used",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -131,6 +191,16 @@
   },
   {
     "check": "test_fallback_stays_in_allowed_list",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "models called over 10 requests": "backup-model, broken-model"
+    },
+    "doc": "Fallback never uses a model outside the allowed list"
+  },
+  {
+    "check": "test_fallback_stays_in_allowed_list",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -142,6 +212,16 @@
   {
     "check": "test_no_retention_hardened",
     "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "prompt found in": "nowhere"
+    },
+    "doc": "Hardened settings: prompt text is stored nowhere"
+  },
+  {
+    "check": "test_no_retention_hardened",
+    "gateway": "bifrost",
     "outcome": "passed",
     "message": "",
     "details": {
@@ -173,6 +253,18 @@
   },
   {
     "check": "test_retention_default",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "stores prompts by default": "yes",
+      "prompt found in": "file /app/data/logs.db-wal"
+    },
+    "doc": "Default settings: is prompt text stored? (informational)"
+  },
+  {
+    "check": "test_retention_default",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -186,6 +278,16 @@
   {
     "check": "test_cost_tracked_default",
     "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "cost of one call (USD)": 3.15e-06
+    },
+    "doc": "Default settings: cost is tracked per call"
+  },
+  {
+    "check": "test_cost_tracked_default",
+    "gateway": "bifrost",
     "outcome": "passed",
     "message": "",
     "details": {
@@ -221,6 +323,16 @@
   },
   {
     "check": "test_cost_tracked_with_no_retention",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "cost of one call (USD)": 3.15e-06
+    },
+    "doc": "Cost is still tracked while No-Retention settings are on"
+  },
+  {
+    "check": "test_cost_tracked_with_no_retention",
     "gateway": "mlflow",
     "outcome": "failed",
     "message": "AssertionError: no cost available: cost tracking depends on stored request traces\nassert (None)",
@@ -232,6 +344,16 @@
   {
     "check": "test_requires_key",
     "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status without key": 401
+    },
+    "doc": "Calls without a key are refused"
+  },
+  {
+    "check": "test_requires_key",
+    "gateway": "bifrost",
     "outcome": "passed",
     "message": "",
     "details": {
@@ -271,6 +393,16 @@
   },
   {
     "check": "test_wrong_key_refused",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "status with wrong key": 401
+    },
+    "doc": "Calls with a wrong key are refused"
+  },
+  {
+    "check": "test_wrong_key_refused",
     "gateway": "mlflow",
     "outcome": "failed",
     "message": "assert 200 in (401, 403)\n +  where 200 = <Response [200 OK]>.status_code",
@@ -297,7 +429,21 @@
     "details": {
       "how": "virtual key limited to fast-model",
       "allowed model": 200,
-      "other model": 403
+      "other model": 403,
+      "other model reached the provider": false
+    },
+    "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
+  },
+  {
+    "check": "test_per_key_model_restriction",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "how": "virtual key limited to fast-model (from config)",
+      "allowed model": 200,
+      "other model": 400,
+      "other model reached the provider": false
     },
     "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
   },
@@ -317,7 +463,8 @@
     "details": {
       "how": "user with a role that may USE every endpoint except outside-model",
       "allowed model": 200,
-      "other model": 403
+      "other model": 403,
+      "other model reached the provider": false
     },
     "doc": "A key can be limited to certain models (e.g. one key per compliance mode)"
   },
@@ -328,6 +475,17 @@
     "message": "",
     "details": {
       "read model config without key": 401
+    },
+    "doc": "Gateway configuration can't be read or changed without logging in"
+  },
+  {
+    "check": "test_management_api_locked",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "list providers without login": 401,
+      "add a provider without login": 401
     },
     "doc": "Gateway configuration can't be read or changed without logging in"
   },
@@ -366,6 +524,17 @@
   },
   {
     "check": "test_app_credential_cannot_reconfigure",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "add a provider with the app's virtual key": 401,
+      "create a virtual key with the app's virtual key": 401
+    },
+    "doc": "The app's own (non-admin) credential can't change gateway configuration"
+  },
+  {
+    "check": "test_app_credential_cannot_reconfigure",
     "gateway": "mlflow",
     "outcome": "failed",
     "message": "Failed: there is no separate app credential: anyone can change the configuration",
@@ -390,6 +559,17 @@
     "details": {
       "login route says 'Admin UI is Disabled'": true,
       "empty dashboard page still served at /ui (no login possible)": true
+    },
+    "doc": "The admin UI can be switched off or requires login"
+  },
+  {
+    "check": "test_admin_ui_locked",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "admin API without login": 401,
+      "empty UI page still served at / (login required for data)": true
     },
     "doc": "The admin UI can be switched off or requires login"
   },
@@ -426,6 +606,17 @@
   },
   {
     "check": "test_image_pinned",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "image": "maximhq/bifrost:v2.2.6",
+      "Python startup files": "n/a (Go binary)"
+    },
+    "doc": "Runs from an image pinned by digest, with no known malware startup file"
+  },
+  {
+    "check": "test_image_pinned",
     "gateway": "mlflow",
     "outcome": "passed",
     "message": "",
@@ -453,11 +644,25 @@
     "message": "",
     "details": {
       "informational": true,
-      "one at a time: added p50 (ms)": 9.9,
-      "one at a time: added p95 (ms)": 11.0,
-      "10 at once: added p50 (ms)": 50.0,
-      "10 at once: added p95 (ms)": 66.0,
-      "gateway's own overhead header, p50 (ms)": 4.5
+      "one at a time: added p50 (ms)": 9.3,
+      "one at a time: added p95 (ms)": 10.5,
+      "10 at once: added p50 (ms)": 53.3,
+      "10 at once: added p95 (ms)": 75.1,
+      "gateway's own overhead header, p50 (ms)": 4.3
+    },
+    "doc": "Gateway overhead per call (informational)"
+  },
+  {
+    "check": "test_overhead",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "informational": true,
+      "one at a time: added p50 (ms)": 1.6,
+      "one at a time: added p95 (ms)": 1.7,
+      "10 at once: added p50 (ms)": 2.4,
+      "10 at once: added p95 (ms)": 3.0
     },
     "doc": "Gateway overhead per call (informational)"
   },
@@ -468,10 +673,10 @@
     "message": "",
     "details": {
       "informational": true,
-      "one at a time: added p50 (ms)": 12.8,
-      "one at a time: added p95 (ms)": 13.5,
-      "10 at once: added p50 (ms)": 88.5,
-      "10 at once: added p95 (ms)": 188.7,
+      "one at a time: added p50 (ms)": 11.9,
+      "one at a time: added p95 (ms)": 14.3,
+      "10 at once: added p50 (ms)": 91.6,
+      "10 at once: added p95 (ms)": 182.9,
       "gateway's own overhead header, p50 (ms)": 9.0
     },
     "doc": "Gateway overhead per call (informational)"
