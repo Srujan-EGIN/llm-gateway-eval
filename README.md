@@ -79,7 +79,9 @@ uv sync
 uv run python scripts/run_eval.py
 ```
 
-This writes `results/REPORT.md`, plus logs and raw results under `runs/<timestamp>/`. It also runs on GitHub Actions (**Actions → Evaluate gateways → Run workflow**), and the report appears in the run summary.
+The run takes about 5 minutes and ends with a **VERDICT PER GATEWAY** summary (pass count and failed checks for each gateway). It also writes `results/REPORT.md`, plus logs and raw results under `runs/<timestamp>/`.
+
+> Run it through `scripts/run_eval.py`, not `pytest` directly: the script starts the gateways and tells the tests where they are. If you have an older copy, run `git pull` first; Bifrost was added in commit `57926f9`. It also runs on GitHub Actions (**Actions → Evaluate gateways → Run workflow**), and the report appears in the run summary.
 
 The run exits with a non-zero code because MLflow's failures are recorded as failed tests. That's intended: they are findings.
 

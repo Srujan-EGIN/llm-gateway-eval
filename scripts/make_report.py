@@ -104,7 +104,25 @@ def main(run_dir: Path) -> None:
     (ROOT / "results" / "REPORT.md").write_text("\n".join(out), encoding="utf-8")
     (ROOT / "results" / "results.json").write_text(json.dumps(rows, indent=2), encoding="utf-8")
     sys.stdout.reconfigure(encoding="utf-8")
-    print("\n".join(out))
+    print_verdict(rows, score)
+
+
+def print_verdict(rows: list[dict], score: dict) -> None:
+    """Short per-gateway summary at the end of the console output."""
+    bar = "=" * 72
+    print(f"\n{bar}\n  VERDICT PER GATEWAY  (full details: results/REPORT.md)\n{bar}")
+    for g in GATEWAYS:
+        passed, total = score[g]
+        if not total:
+            continue
+        failed = [r["doc"] or r["check"] for r in rows
+                  if r["gateway"] == g and r["outcome"] == "failed"]
+        status = "ALL CHECKS PASSED" if not failed else f"{len(failed)} CHECK(S) FAILED"
+        scope = " (security checks only)" if g == "mlflow_login" else ""
+        print(f"\n  {TITLES[g].rstrip('¹')}{scope}: {passed}/{total}  ->  {status}")
+        for f in failed:
+            print(f"      x {f}")
+    print(f"\n{bar}\n  A failed check is a finding about that gateway, not a broken test.\n{bar}")
 
 
 if __name__ == "__main__":

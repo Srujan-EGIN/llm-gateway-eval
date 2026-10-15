@@ -1,6 +1,6 @@
 # Results: LiteLLM Proxy vs Bifrost vs MLflow AI Gateway
 
-Generated 2026-10-15 14:58 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
+Generated 2026-10-15 16:06 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
 
 | | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
 |---|---|---|---|---|
