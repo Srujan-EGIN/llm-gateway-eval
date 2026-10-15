@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+# Each run folder holds generated keys and raw logs: never commit
+runs/
+.pytest_cache/

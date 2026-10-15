@@ -1,0 +1,18 @@
+[project]
+name = "llm-gateway-eval"
+version = "0.1.0"
+description = "Hands-on evaluation of LiteLLM Proxy vs MLflow AI Gateway against a fixed set of gateway requirements"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "litellm[proxy]==1.104.0",
+    "mlflow==3.17.0",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "httpx>=0.27",
+    "openai>=1.40",
+    "pytest>=8",
+    "pyyaml>=6",
+]
+
+[tool.uv]
+package = false
