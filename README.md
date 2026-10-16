@@ -4,38 +4,51 @@ A hands-on test lab that runs **LiteLLM Proxy**, **Bifrost** and **MLflow AI Gat
 
 **➡️ Full results: [`results/REPORT.md`](results/REPORT.md)**
 
-## The result in one table
+## Final verdict
 
-| Requirement | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on |
-|---|:-:|:-:|:-:|:-:|
-| Chat, streaming, tool calling, embeddings | ✅ | ✅ | ✅ | – |
-| Fallback to a backup model, never to a model outside the allowed list | ✅ | ✅ | ✅ | – |
-| No-Retention: prompt stored nowhere (with hardened settings) | ✅ | ✅ | ✅ | – |
-| Stores prompts with **default** settings | **No** | Yes (request log) | Yes (database + trace files) | – |
-| **Cost tracked while No-Retention is on** | ✅ | ✅ | ❌ | – |
-| Refuses calls with no key or a wrong key | ✅ | ✅ | ❌ | ✅ |
-| A key can be limited to certain models | ✅ | ✅ | ❌ | ✅ |
-| Configuration can't be changed without logging in | ✅ | ✅ | ❌ | ✅ |
-| The app's own credential can't change the configuration | ✅ | ✅ | ❌ | ❌ |
-| Admin UI can be switched off or needs login | ✅ | ✅ | ❌ | ✅ |
-| Image pinned by digest, no known malware file | ✅ | ✅ | ✅ | ✅ |
-| **Checks passed** | **17 / 17** | **17 / 17** | **10 / 17** | **6 / 7** (security only) |
-| Time added per call, 1 / 10 at once (p50) | ~9 / ~53 ms | **~1.6 / ~2.4 ms** | ~12 / ~90 ms | – |
+| Area (number of graded checks) | LiteLLM Proxy | Bifrost | MLflow AI Gateway |
+|---|:-:|:-:|:-:|
+| Basic features (5) | ✅ 5/5 | ✅ 5/5 | ✅ 5/5 |
+| Fallback (2) | ✅ 2/2 | ✅ 2/2 | ✅ 2/2 |
+| No-Retention and cost (3) | ✅ 3/3 | ✅ 3/3 | ⚠️ 2/3 |
+| Security (7) | ✅ 7/7 | ✅ 7/7 | ❌ 1/7 |
+| **Under load (8)** | ✅ **8/8** | ⚠️ 7/8 | ⚠️ 5/8 |
+| **All graded checks** | **25 / 25** | **24 / 25** | **15 / 25** |
+| Time added, 1 request at a time (p50) | ~10 ms | **~1 ms** | ~13 ms |
+| Time added, 100 at once (p50) | ~130 ms | **~1 ms** | ~360 ms |
+| Throughput at 100 at once | ~270 req/s | **~660 req/s** | ~160 req/s |
+| Stores prompts with default settings | **No** | Yes | Yes |
+| **Verdict** | **Recommended**: passes everything; safest defaults; widest provider support | **Strong alternative**: fastest by far; one weak spot (rate limits overshoot) | **Not suitable** as the gateway: insecure by default, no cost with No-Retention |
 
-– = not tested (same behaviour as plain MLflow)
+Every gateway ran with the **same budget**: 4 CPUs each, and 4 worker processes for the Python gateways (LiteLLM, MLflow). LiteLLM also had Redis, as in production.
+
+### Under load: what each feature does with 50–100 requests at once
+
+| Check under load | LiteLLM | Bifrost | MLflow |
+|---|:-:|:-:|:-:|
+| 200 requests, every caller gets its own answer (none mixed up) | ✅ 200/200 | ✅ 200/200 | ✅ 200/200 |
+| 50 streams at once complete correctly | ✅ 50/50 | ✅ 50/50 | ✅ 50/50 |
+| 100 requests to a failing model all fall back, never outside the allowed list | ✅ 100/100 | ✅ 100/100 | ✅ 100/100 |
+| Limited key: allowed model passes, other model never reaches the provider | ✅ 50/50 + 50/50 | ✅ 50/50 + 50/50 | ❌ no keys |
+| **Rate limit 20/min holds under a 60-request burst** | ✅ **20 let through** | ❌ **24–26 let through** | ❌ not available |
+| 100 private prompts: none stored (hardened) | ✅ | ✅ | ✅ |
+| 100 calls: exactly 100 usage records, correct total cost | ✅ 100/100 | ✅ 100/100 | ❌ no records |
+| No errors at 50 and 100 at once (800 requests) | ✅ 0 errors | ✅ 0 errors | ✅ 0 errors |
 
 ### What the findings mean
 
-1. **LiteLLM and Bifrost both meet every requirement tested.** They differ on defaults and speed:
-   - **Safe defaults:** LiteLLM doesn't store prompt text even with default settings. Bifrost stores it in its request log until `disable_content_logging` is switched on, so that setting has to be in every deployment.
-   - **Speed:** Bifrost (Go) adds ~1–3 ms. LiteLLM (Python) adds ~9 ms one at a time and ~50 ms with 10 at once. This test ran LiteLLM with **one worker process**, while Bifrost uses all CPU cores by default. LiteLLM can run more workers or instances, so the gap shrinks in production. Even so, Bifrost has much more headroom.
-   - **What wasn't tested here:** provider coverage (LiteLLM lists 100+ providers, Bifrost about 30, including Bedrock, Azure, vLLM and Ollama), how mature each project is, and which features each keeps behind a paid tier.
-2. **MLflow can't do No-Retention and cost tracking together.** It works out cost and budgets from its stored request traces, and those traces contain the prompts. Turning traces off removes both. LiteLLM and Bifrost both keep a usage and cost record without the prompt text.
-3. **MLflow's gateway is open by default.** Without its login add-on, anyone who can reach the server can call models, read the configuration, and add provider credentials. The add-on fixes most of this, but it needs the `-full` image, and **any logged-in user can still add provider credentials and destination URLs**.
-4. **Small notes:**
-   - LiteLLM's `DISABLE_ADMIN_UI` blocks the login, but an empty dashboard page is still served at `/ui`.
-   - Bifrost serves its UI page without login, but every admin API needs login.
-   - Bifrost refuses a model the key isn't allowed to use with `400` when the provider isn't named, and `403 model_blocked` when it is. Either way the request never reaches the provider.
+1. **LiteLLM passes every check, including all of them under load.** It also has the safest defaults: it doesn't store prompt text even without hardening.
+2. **Bifrost is far faster and almost as complete:**
+   - It adds ~1 ms where LiteLLM adds ~10 ms (one at a time) and ~130 ms (100 at once), and it handles about 2.4 times the throughput on the same 4 CPUs.
+   - **Its rate limit overshoots under a burst.** A 20/minute limit let 24–26 of 60 simultaneous requests through, on two separate runs. The counter isn't exact when requests arrive at the same moment. Fine for cost control; not for strict quotas.
+   - It stores prompts until `disable_content_logging` is switched on, so that setting must be in every deployment.
+   - **Keep-alive:** set `keep_alive_timeout_in_seconds` below the provider's idle timeout. With a provider that drops idle connections quickly, Bifrost (with retries off) returned occasional `502` errors on reused connections. Its docs describe this setting for exactly that case.
+3. **MLflow can't do No-Retention and cost tracking together.** It works out cost and budgets from its stored request traces, and those traces contain the prompts. It has no per-key rate limits, and it **slows down most under load** (~360 ms added at 100 at once).
+4. **MLflow's gateway is open by default.** Without its login add-on, anyone who can reach the server can call models, read the configuration and add provider credentials. The add-on (MLflow + login: 6/7 security checks) fixes most of this, but **any logged-in user can still add provider credentials and destination URLs**.
+5. **Corrections made while testing:**
+   - **LiteLLM's first rate-limit result (46 of 60) was my misconfiguration.** Redis set only in `router_settings` isn't used for limits across workers; it must also be set with the `REDIS_HOST`/`REDIS_PORT` environment variables. With that, the limit held exactly.
+   - **Bifrost's early `502` errors** came from the fake provider's short 5-second keep-alive, now raised to a realistic 65 s.
+6. **Not tested here:** real providers (Bedrock, Azure, on-prem), provider coverage (LiteLLM 100+ providers, Bifrost ~30), project maturity, and paid-tier features.
 
 ## How it works
 
@@ -98,7 +111,7 @@ uv sync
 uv run python scripts/run_eval.py
 ```
 
-The run takes about 5 minutes and ends with a **VERDICT PER GATEWAY** summary (pass count and failed checks for each gateway). It also writes `results/REPORT.md`, plus logs and raw results under `runs/<timestamp>/`.
+The run takes about 8–10 minutes and ends with a **VERDICT PER GATEWAY** summary (pass count and failed checks for each gateway). It also writes `results/REPORT.md`, plus logs and raw results under `runs/<timestamp>/`.
 
 > Run it through `scripts/run_eval.py`, not `pytest` directly: the script starts the gateways and tells the tests where they are. If you have an older copy, run `git pull` first; Bifrost was added in commit `57926f9`. It also runs on GitHub Actions (**Actions → Evaluate gateways → Run workflow**), and the report appears in the run summary.
 
@@ -107,6 +120,6 @@ The run exits with a non-zero code because MLflow's failures are recorded as fai
 ## Limits of this test
 
 - **The provider is fake.** Real Amazon Bedrock, Azure AI Foundry and on-prem servers weren't called, so provider-specific features (prompt caching, guardrails, EU inference profiles, Azure deployments) still need a test with real credentials.
-- **Speed was measured on one machine.** LiteLLM ran with one worker, while Bifrost and MLflow used their defaults. Use the numbers to compare the gateways, not to predict production.
+- **Speed was measured on one machine**, with every gateway capped at 4 CPUs (4 workers for LiteLLM and MLflow). Use the numbers to compare the gateways, not to predict production.
 - **The No-Retention check covers what each gateway writes itself** (logs, database, data folder). It doesn't cover the provider, or tools you add later such as Langfuse or OpenTelemetry exporters.
 - Versions were current as of October 2026. All three projects release often, so re-run the tests after upgrading.

@@ -9,6 +9,8 @@ model_list:
     litellm_params: {model: openai/smart-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   - model_name: gpt-4o-mini
     litellm_params: {model: openai/gpt-4o-mini, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: gpt-4o-mini-2024-07-18
+    litellm_params: {model: openai/gpt-4o-mini-2024-07-18, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   - model_name: embed-model
     litellm_params: {model: openai/embed-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   - model_name: eu-chat

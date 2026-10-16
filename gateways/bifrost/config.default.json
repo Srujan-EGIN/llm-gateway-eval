@@ -25,7 +25,8 @@
       "network_config": {
         "base_url": "${MOCK_URL}",
         "allow_private_network": true,
-        "max_retries": 0
+        "max_retries": 0,
+        "keep_alive_timeout_in_seconds": 30
       }
     }
   },
@@ -66,6 +67,25 @@
             ]
           }
         ]
+      },
+      {
+        "id": "vk-ratelimited",
+        "name": "rate-limited",
+        "value": "${BIFROST_RATELIMITED_KEY}",
+        "is_active": true,
+        "rate_limit_id": "rl-burst",
+        "provider_configs": [
+          {
+            "provider": "openai",
+            "allowed_models": [
+              "*"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          }
+        ]
       }
     ],
     "routing_rules": [
@@ -86,6 +106,13 @@
         "fallbacks": [
           "openai/backup-model"
         ]
+      }
+    ],
+    "rate_limits": [
+      {
+        "id": "rl-burst",
+        "request_max_limit": 20,
+        "request_reset_duration": "1m"
       }
     ]
   },

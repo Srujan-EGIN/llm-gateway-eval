@@ -1,6 +1,6 @@
 # LiteLLM Proxy, "hardened" profile: the recommended production settings.
 # ${...} placeholders are filled in by scripts/run_eval.py at start-up (keys are random per run).
-# Also set on the container: DISABLE_ADMIN_UI=True, DATABASE_URL=<Postgres>.
+# Also set on the container: DISABLE_ADMIN_UI=True, DATABASE_URL=<Postgres>; runs 4 workers.
 
 model_list:
   - model_name: fast-model
@@ -9,6 +9,8 @@ model_list:
     litellm_params: {model: openai/smart-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   - model_name: gpt-4o-mini
     litellm_params: {model: openai/gpt-4o-mini, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: gpt-4o-mini-2024-07-18
+    litellm_params: {model: openai/gpt-4o-mini-2024-07-18, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   - model_name: embed-model
     litellm_params: {model: openai/embed-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
   # "eu-chat": the primary is broken on purpose; the EU backup must take over.
@@ -24,6 +26,9 @@ router_settings:
   fallbacks:
     - eu-chat: [eu-backup]
   num_retries: 0
+  # Production setup: Redis shares rate limits and cooldowns across the 4 workers.
+  redis_host: "${REDIS_HOST}"
+  redis_port: 6379
 
 litellm_settings:
   num_retries: 0

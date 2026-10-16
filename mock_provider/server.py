@@ -10,6 +10,7 @@ Lets both gateways be tested for free and deterministically:
 import asyncio
 import json
 import os
+import re
 import time
 import uuid
 
@@ -28,6 +29,8 @@ MODELS = {
     "embed-model": {"residency": "eu"},
     # A real model name, so each gateway's built-in price list can be tested.
     "gpt-4o-mini": {"residency": "eu"},
+    # Used only by the "usage counted correctly under load" test, so its records can be isolated.
+    "gpt-4o-mini-2024-07-18": {"residency": "eu"},
 }
 
 app = FastAPI(title="mock-provider")
@@ -113,6 +116,9 @@ async def chat(request: Request):
         }
 
     answer = f"Reply from {model}."
+    # Echo a request tag ("TAG:abc") so load tests can spot answers delivered to the wrong caller.
+    if tag := re.search(r"TAG:[A-Za-z0-9-]+", prompt):
+        answer += f" {tag.group(0)}"
     if body.get("stream"):
         async def gen():
             words = answer.split(" ")

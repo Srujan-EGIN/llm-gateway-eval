@@ -4,6 +4,7 @@
 """
 
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,11 @@ SECTIONS = {
     "Security": ["test_requires_key", "test_wrong_key_refused", "test_per_key_model_restriction",
                  "test_management_api_locked",
                  "test_app_credential_cannot_reconfigure", "test_admin_ui_locked", "test_image_pinned"],
-    "Speed": ["test_overhead"],
+    "Under load (concurrency)": ["test_answers_not_mixed_up_under_load", "test_streaming_under_load",
+                                 "test_fallback_under_load", "test_key_limits_under_load",
+                                 "test_rate_limit_under_burst", "test_no_retention_under_load",
+                                 "test_usage_counted_under_load", "test_no_errors_under_load"],
+    "Speed": ["test_overhead", "test_throughput"],
 }
 
 
@@ -32,7 +37,7 @@ def cell(r: dict | None) -> str:
         return "–"
     d = r["details"]
     if d.get("informational"):
-        shown = {k: v for k, v in d.items() if k != "informational"}
+        shown = {k: no_negative(v) for k, v in d.items() if k != "informational"}
         return "ℹ️ " + "; ".join(f"{k}: {v}" for k, v in shown.items())
     icon = {"passed": "✅", "failed": "❌", "skipped": "⏭️"}[r["outcome"]]
     detail = "; ".join(f"{k}: {v}" for k, v in d.items())
@@ -43,6 +48,51 @@ def cell(r: dict | None) -> str:
 
 def esc(s: str) -> str:
     return s.replace("|", "\\|").replace("\n", " ")
+
+
+def no_negative(value):
+    """Overhead below measurement noise can come out slightly negative; show it as "<1"."""
+    if isinstance(value, str):
+        return re.sub(r"-\d+(\.\d+)?", "<1", value)
+    return value
+
+
+def comparison_table(rows: list[dict], by: dict) -> list[str]:
+    """One row per area: graded checks passed per gateway, plus key speed figures."""
+    main_gws = [g for g in GATEWAYS if g != "mlflow_login"]
+    lines = ["## Final comparison", "",
+             "| Area | " + " | ".join(TITLES[g].rstrip("¹") for g in main_gws) + " |",
+             "|---|" + ":-:|" * len(main_gws)]
+    for section, checks in SECTIONS.items():
+        cells = []
+        for g in main_gws:
+            graded = [by[(c, g)] for c in checks if (c, g) in by
+                      and not by[(c, g)]["details"].get("informational")]
+            if not graded:
+                cells.append("–")
+                continue
+            ok = sum(r["outcome"] == "passed" for r in graded)
+            icon = "✅" if ok == len(graded) else ("⚠️" if ok >= len(graded) / 2 else "❌")
+            cells.append(f"{icon} {ok}/{len(graded)}")
+        if any(c != "–" for c in cells):
+            lines.append(f"| {section} | " + " | ".join(cells) + " |")
+
+    def detail(check, g, key):
+        r = by.get((check, g))
+        return no_negative((r or {}).get("details", {}).get(key, "–"))
+    for label, check, key in [
+        ("Time added, 1 at once (p50 / p95 ms)", "test_overhead", "1 at once: added p50 / p95 (ms)"),
+        ("Time added, 100 at once (p50 / p95 ms)", "test_overhead", "100 at once: added p50 / p95 (ms)"),
+        ("Throughput at 100 at once (req/s)", "test_throughput", "gateway req/s at 100 at once"),
+        ("Stores prompts with default settings", "test_retention_default", "stores prompts by default"),
+    ]:
+        lines.append(f"| {label} | " + " | ".join(str(detail(check, g, key)) for g in main_gws) + " |")
+    total = []
+    for g in main_gws:
+        graded = [r for r in rows if r["gateway"] == g and not r["details"].get("informational")]
+        total.append(f"**{sum(r['outcome'] == 'passed' for r in graded)} / {len(graded)}**")
+    lines += [f"| **All graded checks** | " + " | ".join(total) + " |", ""]
+    return lines
 
 
 def main(run_dir: Path) -> None:
@@ -76,6 +126,7 @@ def main(run_dir: Path) -> None:
         "checks only**; every other behaviour is the same as plain MLflow.",
         "",
     ]
+    out += comparison_table(rows, by)
     for section, checks in SECTIONS.items():
         present = [c for c in checks if any((c, g) in by for g in GATEWAYS)]
         if not present:

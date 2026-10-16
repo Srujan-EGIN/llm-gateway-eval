@@ -1,15 +1,30 @@
 # Results: LiteLLM Proxy vs Bifrost vs MLflow AI Gateway
 
-Generated 2026-10-15 16:17 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
+Generated 2026-10-16 11:36 by `scripts/run_eval.py`. Every row is an automated test in [`tests/`](../tests).
 
 | | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
 |---|---|---|---|---|
-| **Checks passed** | **17 / 17** | **17 / 17** | **10 / 17** | **6 / 7** |
+| **Checks passed** | **25 / 25** | **24 / 25** | **15 / 25** | **6 / 7** |
 | Image | `ghcr.io/berriai/litellm-database:v1.104.0` | `maximhq/bifrost:v2.2.6` | `ghcr.io/mlflow/mlflow:v3.17.0` | `ghcr.io/mlflow/mlflow:v3.17.0-full` |
 
 ✅ passed  ❌ failed  ℹ️ measured, not graded  – not tested
 
 ¹ MLflow with `--app-name basic-auth` (needs the `-full` image). Tested for **security checks only**; every other behaviour is the same as plain MLflow.
+
+## Final comparison
+
+| Area | LiteLLM Proxy | Bifrost | MLflow AI Gateway |
+|---|:-:|:-:|:-:|
+| Basic features | ✅ 5/5 | ✅ 5/5 | ✅ 5/5 |
+| Fallback | ✅ 2/2 | ✅ 2/2 | ✅ 2/2 |
+| No-Retention and cost | ✅ 3/3 | ✅ 3/3 | ⚠️ 2/3 |
+| Security | ✅ 7/7 | ✅ 7/7 | ❌ 1/7 |
+| Under load (concurrency) | ✅ 8/8 | ⚠️ 7/8 | ⚠️ 5/8 |
+| Time added, 1 at once (p50 / p95 ms) | 9.6 / 11.8 | 1.3 / 0.9 | 13.2 / 15.9 |
+| Time added, 100 at once (p50 / p95 ms) | 130.8 / 175.7 | 1.1 / <1 | 364.3 / 506.1 |
+| Throughput at 100 at once (req/s) | 271.2 | 656.7 | 162.4 |
+| Stores prompts with default settings | no | yes | yes |
+| **All graded checks** | **25 / 25** | **24 / 25** | **15 / 25** |
 
 ## Basic features
 
@@ -49,11 +64,25 @@ Generated 2026-10-15 16:17 by `scripts/run_eval.py`. Every row is an automated t
 | The admin UI can be switched off or requires login | ✅ login route says 'Admin UI is Disabled': True; empty dashboard page still served at /ui (no login possible): True | ✅ admin API without login: 401; empty UI page still served at / (login required for data): True | ❌ UI status without login: 200; AssertionError: the MLflow UI (including gateway settings) is open | ✅ UI status without login: 401 |
 | Runs from an image pinned by digest, with no known malware startup file | ✅ image: ghcr.io/berriai/litellm-database:v1.104.0; litellm_init.pth (March 2026 malware) present: False | ✅ image: maximhq/bifrost:v2.2.6; Python startup files: n/a (Go binary) | ✅ image: ghcr.io/mlflow/mlflow:v3.17.0; litellm_init.pth (March 2026 malware) present: False | ✅ image: ghcr.io/mlflow/mlflow:v3.17.0-full; litellm_init.pth (March 2026 malware) present: False |
 
+## Under load (concurrency)
+
+| Check | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
+|---|---|---|---|---|
+| 200 requests, 50 at once: all succeed and every caller gets its own answer | ✅ succeeded: 200 / 200; answers delivered to the wrong caller: 0 | ✅ succeeded: 200 / 200; answers delivered to the wrong caller: 0 | ✅ succeeded: 200 / 200; answers delivered to the wrong caller: 0 | – |
+| 50 streams at once: every stream completes with its own full answer | ✅ complete, correct streams: 50 / 50 | ✅ complete, correct streams: 50 / 50 | ✅ complete, correct streams: 50 / 50 | – |
+| 100 requests to a failing model, 50 at once: all fall back, never outside the allowed list | ✅ answered by backup-model: 100 / 100; models the provider received: backup-model, broken-model | ✅ answered by backup-model: 100 / 100; models the provider received: backup-model, broken-model | ✅ answered by backup-model: 100 / 100; models the provider received: backup-model, broken-model | – |
+| 100 mixed requests with a limited key, 50 at once: allowed ones pass, others never reach the provider | ✅ allowed model succeeded: 50 / 50; other model refused: 50 / 50; other model reached the provider: False | ✅ allowed model succeeded: 50 / 50; other model refused: 50 / 50; other model reached the provider: False | ❌ Failed: no per-key model limits (no keys without the login add-on) | – |
+| A key limited to 20 requests/minute lets at most 20 of a 60-request burst through | ✅ let through: 20 / 60 (limit 20); refused with 429: 40; other errors: 0 | ❌ let through: 26 / 60 (limit 20); refused with 429: 34; other errors: 0; assert (26 <= 20) | ❌ Failed: no per-key request rate limits in MLflow's gateway (only cost budgets, which need stored traces) | – |
+| 100 private prompts, 50 at once (hardened settings): none stored anywhere | ✅ succeeded: 100 / 100; prompts found in: nowhere | ✅ succeeded: 100 / 100; prompts found in: nowhere | ✅ succeeded: 100 / 100; prompts found in: nowhere | – |
+| 100 identical calls, 50 at once (No-Retention on): exactly 100 usage records with the right total cost | ✅ usage records: 100 / 100; total cost (USD): 0.00051000; same cost on every record: True | ✅ usage records: 100 / 100; total cost (USD): 0.00051000; same cost on every record: True | ❌ Failed: no usage or cost records while No-Retention (usage tracking off) is on | – |
+| No failed requests at 50 and 100 requests at once | ✅ errors at 50 at once: 0 of 400; errors at 100 at once: 0 of 400 | ✅ errors at 50 at once: 0 of 400; errors at 100 at once: 0 of 400 | ✅ errors at 50 at once: 0 of 400; errors at 100 at once: 0 of 400 | – |
+
 ## Speed
 
 | Check | LiteLLM Proxy | Bifrost | MLflow AI Gateway | MLflow + login add-on¹ |
 |---|---|---|---|---|
-| Gateway overhead per call (informational) | ℹ️ one at a time: added p50 (ms): 9.2; one at a time: added p95 (ms): 10.5; 10 at once: added p50 (ms): 63.2; 10 at once: added p95 (ms): 99.5; gateway's own overhead header, p50 (ms): 4.3 | ℹ️ one at a time: added p50 (ms): 1.8; one at a time: added p95 (ms): 2.3; 10 at once: added p50 (ms): 2.2; 10 at once: added p95 (ms): 3.1 | ℹ️ one at a time: added p50 (ms): 14.6; one at a time: added p95 (ms): 18.4; 10 at once: added p50 (ms): 114.3; 10 at once: added p95 (ms): 253.5; gateway's own overhead header, p50 (ms): 11.0 | – |
+| Time added per call at 1 / 10 / 50 / 100 requests at once (informational) | ℹ️ 1 at once: added p50 / p95 (ms): 9.6 / 11.8; 10 at once: added p50 / p95 (ms): 12.0 / 35.5; 50 at once: added p50 / p95 (ms): 81.1 / 123.2; 100 at once: added p50 / p95 (ms): 130.8 / 175.7 | ℹ️ 1 at once: added p50 / p95 (ms): 1.3 / 0.9; 10 at once: added p50 / p95 (ms): 2.8 / 2.3; 50 at once: added p50 / p95 (ms): 3.1 / 16.8; 100 at once: added p50 / p95 (ms): 1.1 / <1 | ℹ️ 1 at once: added p50 / p95 (ms): 13.2 / 15.9; 10 at once: added p50 / p95 (ms): 12.1 / 58.1; 50 at once: added p50 / p95 (ms): 92.5 / 361.7; 100 at once: added p50 / p95 (ms): 364.3 / 506.1 | – |
+| Requests per second through the gateway at 100 at once (informational) | ℹ️ gateway req/s at 100 at once: 271.2; provider alone could do (req/s): 1000 | ℹ️ gateway req/s at 100 at once: 656.7; provider alone could do (req/s): 1000 | ℹ️ gateway req/s at 100 at once: 162.4; provider alone could do (req/s): 1000 | – |
 
 ## How to read this
 

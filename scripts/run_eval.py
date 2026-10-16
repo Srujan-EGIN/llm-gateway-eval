@@ -41,6 +41,10 @@ MASTER_KEY = "sk-" + secrets.token_hex(16)
 BIFROST_ADMIN = ("admin", "Bf-" + secrets.token_hex(12))
 BIFROST_APP_KEY = "sk-bf-" + secrets.token_hex(16)      # virtual key: all models
 BIFROST_LIMITED_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: fast-model only
+BIFROST_RATELIMITED_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: 20 requests/minute
+# Fairness for the load tests: every gateway container gets the same CPU budget, and the
+# Python gateways (LiteLLM, MLflow) run one worker process per CPU. Bifrost (Go) uses its CPUs natively.
+GATEWAY_CPUS = 4
 PG_PASSWORD = secrets.token_hex(8)
 MOCK_IN_NET = "http://gweval-mock:9100"  # how gateways reach the provider
 MOCK_FROM_HOST = "http://127.0.0.1:9100"  # how tests reach it directly (latency baseline)
@@ -66,9 +70,12 @@ def cleanup() -> None:
 
 
 def run_container(name: str, image: str, args: list[str], *, ports: list[str] = (),
-                  env: dict | None = None, mounts: list[str] = (), entrypoint: str | None = None):
+                  env: dict | None = None, mounts: list[str] = (), entrypoint: str | None = None,
+                  cpus: int | None = None):
     cmd = ["run", "-d", "--name", PREFIX + name, "--network", NET,
            "--network-alias", PREFIX + name]
+    if cpus:
+        cmd += ["--cpus", str(cpus)]
     for p in ports:
         cmd += ["-p", f"127.0.0.1:{p}"]
     for k, v in (env or {}).items():
@@ -112,13 +119,16 @@ def render(template: Path, out: Path, **values: str) -> Path:
 def start_litellm(profile: str, port: int) -> None:
     cfg = render(GATEWAYS_DIR / "litellm" / f"config.{profile}.yaml",
                  RUN_DIR / f"litellm-{profile}" / "config.yaml",
-                 MOCK_URL=MOCK_IN_NET, MASTER_KEY=MASTER_KEY)
+                 MOCK_URL=MOCK_IN_NET, MASTER_KEY=MASTER_KEY, REDIS_HOST=PREFIX + "redis")
     env = {"DATABASE_URL": f"postgresql://postgres:{PG_PASSWORD}@gweval-pg:5432/litellm_{profile}"}
     if profile == "hardened":
         env["DISABLE_ADMIN_UI"] = "True"
+        # Shared state for the 4 workers (rate limits, cooldowns). router_settings alone is not enough.
+        env["REDIS_HOST"], env["REDIS_PORT"] = PREFIX + "redis", "6379"
     run_container(f"litellm-{profile}", IMAGES["litellm"],
-                  ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"],
-                  ports=[f"{port}:4000"], env=env,
+                  ["--config", "/app/config.yaml", "--port", "4000",
+                   "--num_workers", str(GATEWAY_CPUS if profile == "hardened" else 1)],
+                  ports=[f"{port}:4000"], env=env, cpus=GATEWAY_CPUS,
                   mounts=[f"{cfg.resolve()}:/app/config.yaml:ro"])
 
 
@@ -127,8 +137,10 @@ def start_bifrost(profile: str, port: int) -> None:
     cfg = render(GATEWAYS_DIR / "bifrost" / f"config.{profile}.json",
                  RUN_DIR / f"bifrost-{profile}" / "config.json",
                  MOCK_URL=MOCK_IN_NET, BIFROST_ADMIN_PASSWORD=BIFROST_ADMIN[1],
-                 BIFROST_APP_KEY=BIFROST_APP_KEY, BIFROST_LIMITED_KEY=BIFROST_LIMITED_KEY)
+                 BIFROST_APP_KEY=BIFROST_APP_KEY, BIFROST_LIMITED_KEY=BIFROST_LIMITED_KEY,
+                 BIFROST_RATELIMITED_KEY=BIFROST_RATELIMITED_KEY)
     run_container(f"bifrost-{profile}", IMAGES["bifrost"], [], ports=[f"{port}:8080"],
+                  cpus=GATEWAY_CPUS,
                   mounts=[f"{cfg.resolve()}:/app/data/config.json:ro"])
 
 
@@ -149,14 +161,14 @@ def start_mlflow(name: str = "mlflow", port: int = 5000, login: bool = False) ->
             "--backend-store-uri", "sqlite:////data/mlflow.db",
             "--default-artifact-root", "/data/artifacts",
             "--allowed-hosts", f"localhost:{port},127.0.0.1:{port},{PREFIX}{name}:5000",
-            "--workers", "1"]
+            "--workers", str(GATEWAY_CPUS)]
     if login:
         # MLflow's optional login add-on. Needs the "-full" image (mlflow[auth]).
         args += ["--app-name", "basic-auth"]
         env["MLFLOW_AUTH_ADMIN_PASSWORD"] = MLFLOW_ADMIN[1]
         env["MLFLOW_FLASK_SERVER_SECRET_KEY"] = secrets.token_hex(16)
     run_container(name, IMAGES["mlflow_login" if login else "mlflow"], args,
-                  ports=[f"{port}:5000"], env=env, mounts=[f"{PREFIX}{name}-data:/data"])
+                  ports=[f"{port}:5000"], env=env, cpus=GATEWAY_CPUS, mounts=[f"{PREFIX}{name}-data:/data"])
 
 
 def provision_mlflow(url: str = "http://127.0.0.1:5000", login: bool = False) -> None:
@@ -207,6 +219,7 @@ def targets() -> dict:
                 "api_key": BIFROST_APP_KEY,
                 "auth_header": f"Bearer {BIFROST_APP_KEY}",
                 "limited_key": BIFROST_LIMITED_KEY,
+                "ratelimited_key": BIFROST_RATELIMITED_KEY,
                 "admin": list(BIFROST_ADMIN),
                 "sinks": [{"type": "logs", "container": PREFIX + "bifrost-hardened"},
                           {"type": "dir", "container": PREFIX + "bifrost-hardened",
@@ -241,7 +254,7 @@ def targets() -> dict:
 
 
 def save_logs() -> None:
-    for c in ["mock", "pg", "litellm-hardened", "litellm-default", "bifrost-hardened",
+    for c in ["mock", "pg", "redis", "litellm-hardened", "litellm-default", "bifrost-hardened",
               "bifrost-default", "mlflow", "mlflow-login"]:
         out = docker("logs", PREFIX + c, check=False)
         (RUN_DIR / f"{c}.log").write_text((out.stdout or "") + (out.stderr or ""),
@@ -258,12 +271,15 @@ def main() -> int:
         # Mock provider: runs on the MLflow image only because it already has fastapi/uvicorn.
         run_container("mock", IMAGES["mlflow"],
                       ["-m", "uvicorn", "mock_provider.server:app", "--host", "0.0.0.0",
-                       "--port", "9100", "--log-level", "warning"],
+                       "--port", "9100", "--log-level", "warning",
+                       # Cloud providers keep idle connections ~60 s; uvicorn's default is 5 s.
+                       "--timeout-keep-alive", "65"],
                       ports=["9100:9100"], env={"MOCK_LATENCY_MS": "100", "PYTHONPATH": "/app"},
                       mounts=[f"{(ROOT / 'mock_provider').resolve()}:/app/mock_provider:ro"],
                       entrypoint="python")
 
         run_container("pg", IMAGES["postgres"], [], env={"POSTGRES_PASSWORD": PG_PASSWORD})
+        run_container("redis", IMAGES["redis"], [])  # LiteLLM: shared limits across workers
         for _ in range(60):
             if docker("exec", PREFIX + "pg", "pg_isready", "-U", "postgres",
                       check=False).returncode == 0:

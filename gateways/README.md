@@ -23,4 +23,6 @@ All gateways get the **same setup**:
 - Bifrost: `disable_content_logging: true`
 - MLflow: `usage_tracking: false` on the endpoint
 
+**Same resources for the load tests:** every gateway container is capped at 4 CPUs; LiteLLM (hardened) and MLflow run 4 worker processes; LiteLLM also gets Redis (via `REDIS_HOST`/`REDIS_PORT`) so rate limits are shared across workers. Bifrost has a 20 requests/minute virtual key (`rate-limited`) for the rate-limit test.
+
 Images are pinned by digest in [`../images.json`](../images.json).
