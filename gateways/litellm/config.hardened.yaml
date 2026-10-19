@@ -22,10 +22,58 @@ model_list:
   - model_name: outside-model
     litellm_params: {model: openai/outside-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
 
+  # ---- Routing tests (tests/test_7_routing.py) ----
+  # 80/20 weighted split across two deployments of one model group
+  - model_name: split-model
+    litellm_params: {model: openai/split-a, api_base: "${MOCK_URL}/v1", api_key: fake-key, weight: 8}
+  - model_name: split-model
+    litellm_params: {model: openai/split-b, api_base: "${MOCK_URL}/v1", api_key: fake-key, weight: 2}
+  # Same model in two regions; requests pick a region with a tag
+  - model_name: regional-chat
+    litellm_params: {model: openai/eu-model, api_base: "${MOCK_URL}/v1", api_key: fake-key, tags: ["region:eu"]}
+  - model_name: regional-chat
+    litellm_params: {model: openai/us-model, api_base: "${MOCK_URL}/v1", api_key: fake-key, tags: ["region:us"]}
+  # Fallback chain: primary and first backup are broken, the second backup works
+  - model_name: eu-primary
+    litellm_params: {model: openai/eu-broken, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: eu-secondary
+    litellm_params: {model: openai/eu-broken-2, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: eu-tertiary
+    litellm_params: {model: openai/eu-model, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  # One healthy and one broken deployment: the broken one should be taken out of rotation
+  - model_name: flaky-model
+    litellm_params: {model: openai/flaky-broken, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+  - model_name: flaky-model
+    litellm_params: {model: openai/flaky-ok, api_base: "${MOCK_URL}/v1", api_key: fake-key}
+
+  # ---- Provider tests (tests/test_8_providers.py): AWS, Azure, Azure AI Foundry, on-prem ----
+  - model_name: aws-claude          # AWS Bedrock (Converse API), signed for eu-central-1
+    litellm_params:
+      model: bedrock/converse/eu.anthropic.claude-test-v1:0
+      aws_access_key_id: AKIAFAKEFAKEFAKE
+      aws_secret_access_key: fake-secret
+      aws_region_name: eu-central-1
+      aws_bedrock_runtime_endpoint: "${MOCK_URL}"
+  - model_name: azure-gpt           # Azure OpenAI, EU deployment
+    litellm_params: {model: azure/gpt-eu-deploy, api_base: "${MOCK_URL}", api_key: fake-azure-key, api_version: "2024-10-21"}
+  - model_name: azure-us-gpt        # Azure OpenAI, US deployment (not allowed in EU Sovereign mode)
+    litellm_params: {model: azure/gpt-us-deploy, api_base: "${MOCK_URL}", api_key: fake-azure-key, api_version: "2024-10-21"}
+  - model_name: foundry-mistral     # Azure AI Foundry, non-OpenAI model
+    litellm_params: {model: azure_ai/Mistral-Large-2411, api_base: "${MOCK_URL}/models", api_key: fake-foundry-key}
+  - model_name: onprem-llama        # on-prem vLLM
+    litellm_params: {model: hosted_vllm/llama-3.1-8b, api_base: "${MOCK_URL}/v1"}
+  - model_name: eu-assistant        # Azure EU is down -> must fall back to AWS EU
+    litellm_params: {model: azure/broken-eu-deploy, api_base: "${MOCK_URL}", api_key: fake-azure-key, api_version: "2024-10-21"}
+
 router_settings:
   fallbacks:
     - eu-chat: [eu-backup]
+    - eu-primary: [eu-secondary, eu-tertiary]
+    - eu-assistant: [aws-claude]
   num_retries: 0
+  enable_tag_filtering: true      # regional-chat: requests choose a region with a tag
+  allowed_fails: 3                # take a deployment out after 3 failures …
+  cooldown_time: 60               # … for 60 seconds
   # Production setup: Redis shares rate limits and cooldowns across the 4 workers.
   redis_host: "${REDIS_HOST}"
   redis_port: 6379
@@ -40,3 +88,11 @@ general_settings:
   master_key: "${MASTER_KEY}"
   proxy_batch_write_at: 2
   store_prompts_in_spend_logs: false    # usage/cost rows are kept, prompt text is not
+
+# ---- Tool connector tests (tests/test_9_mcp.py): a fake MCP server ----
+mcp_servers:
+  files:
+    url: "${MCP_URL}"
+    transport: http
+    auth_type: bearer_token
+    auth_value: "${MCP_TOKEN}"

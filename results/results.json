@@ -5,7 +5,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "tokens reported": 7
+      "tokens reported": 16
     },
     "doc": "Chat completion works"
   },
@@ -15,7 +15,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "tokens reported": 7
+      "tokens reported": 16
     },
     "doc": "Chat completion works"
   },
@@ -25,7 +25,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "tokens reported": 7
+      "tokens reported": 16
     },
     "doc": "Chat completion works"
   },
@@ -281,7 +281,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "cost of one call (USD)": 3.15e-06
+      "cost of one call (USD)": 8.55e-06
     },
     "doc": "Default settings: cost is tracked per call"
   },
@@ -291,7 +291,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "cost of one call (USD)": 3.15e-06
+      "cost of one call (USD)": 8.55e-06
     },
     "doc": "Default settings: cost is tracked per call"
   },
@@ -301,7 +301,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "cost of one call (USD)": 3.15e-06
+      "cost of one call (USD)": 8.55e-06
     },
     "doc": "Default settings: cost is tracked per call"
   },
@@ -311,11 +311,11 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "cost of one call (USD)": 3.15e-06,
+      "cost of one call (USD)": 8.55e-06,
       "usage row in database": {
         "model": "openai/gpt-4o-mini",
-        "spend": 3.15e-06,
-        "total_tokens": 6
+        "spend": 8.55e-06,
+        "total_tokens": 15
       },
       "prompt stored in that row": false
     },
@@ -327,7 +327,7 @@
     "outcome": "passed",
     "message": "",
     "details": {
-      "cost of one call (USD)": 3.15e-06
+      "cost of one call (USD)": 8.55e-06
     },
     "doc": "Cost is still tracked while No-Retention settings are on"
   },
@@ -644,10 +644,10 @@
     "message": "",
     "details": {
       "informational": true,
-      "1 at once: added p50 / p95 (ms)": "9.6 / 11.8",
-      "10 at once: added p50 / p95 (ms)": "12.0 / 35.5",
-      "50 at once: added p50 / p95 (ms)": "81.1 / 123.2",
-      "100 at once: added p50 / p95 (ms)": "130.8 / 175.7"
+      "1 at once: added p50 / p95 (ms)": "8.7 / 12.7",
+      "10 at once: added p50 / p95 (ms)": "12.2 / 28.0",
+      "50 at once: added p50 / p95 (ms)": "59.8 / 89.0",
+      "100 at once: added p50 / p95 (ms)": "85.6 / 94.8"
     },
     "doc": "Time added per call at 1 / 10 / 50 / 100 requests at once (informational)"
   },
@@ -658,10 +658,10 @@
     "message": "",
     "details": {
       "informational": true,
-      "1 at once: added p50 / p95 (ms)": "1.3 / 0.9",
-      "10 at once: added p50 / p95 (ms)": "2.8 / 2.3",
-      "50 at once: added p50 / p95 (ms)": "3.1 / 16.8",
-      "100 at once: added p50 / p95 (ms)": "1.1 / -3.5"
+      "1 at once: added p50 / p95 (ms)": "1.2 / 1.4",
+      "10 at once: added p50 / p95 (ms)": "2.5 / 1.1",
+      "50 at once: added p50 / p95 (ms)": "3.2 / 16.1",
+      "100 at once: added p50 / p95 (ms)": "0.7 / -5.0"
     },
     "doc": "Time added per call at 1 / 10 / 50 / 100 requests at once (informational)"
   },
@@ -672,10 +672,10 @@
     "message": "",
     "details": {
       "informational": true,
-      "1 at once: added p50 / p95 (ms)": "13.2 / 15.9",
-      "10 at once: added p50 / p95 (ms)": "12.1 / 58.1",
-      "50 at once: added p50 / p95 (ms)": "92.5 / 361.7",
-      "100 at once: added p50 / p95 (ms)": "364.3 / 506.1"
+      "1 at once: added p50 / p95 (ms)": "11.5 / 13.0",
+      "10 at once: added p50 / p95 (ms)": "11.1 / 44.0",
+      "50 at once: added p50 / p95 (ms)": "86.6 / 255.6",
+      "100 at once: added p50 / p95 (ms)": "422.8 / 545.1"
     },
     "doc": "Time added per call at 1 / 10 / 50 / 100 requests at once (informational)"
   },
@@ -686,7 +686,7 @@
     "message": "",
     "details": {
       "informational": true,
-      "gateway req/s at 100 at once": 271.2,
+      "gateway req/s at 100 at once": 381.3,
       "provider alone could do (req/s)": 1000
     },
     "doc": "Requests per second through the gateway at 100 at once (informational)"
@@ -698,7 +698,7 @@
     "message": "",
     "details": {
       "informational": true,
-      "gateway req/s at 100 at once": 656.7,
+      "gateway req/s at 100 at once": 683.0,
       "provider alone could do (req/s)": 1000
     },
     "doc": "Requests per second through the gateway at 100 at once (informational)"
@@ -710,7 +710,7 @@
     "message": "",
     "details": {
       "informational": true,
-      "gateway req/s at 100 at once": 162.4,
+      "gateway req/s at 100 at once": 153.6,
       "provider alone could do (req/s)": 1000
     },
     "doc": "Requests per second through the gateway at 100 at once (informational)"
@@ -892,10 +892,10 @@
     "check": "test_rate_limit_under_burst",
     "gateway": "bifrost",
     "outcome": "failed",
-    "message": "assert (26 <= 20)",
+    "message": "assert (22 <= 20)",
     "details": {
-      "let through": "26 / 60 (limit 20)",
-      "refused with 429": 34,
+      "let through": "22 / 60 (limit 20)",
+      "refused with 429": 38,
       "other errors": 0
     },
     "doc": "A key limited to 20 requests/minute lets at most 20 of a 60-request burst through"
@@ -948,7 +948,7 @@
     "message": "",
     "details": {
       "usage records": "100 / 100",
-      "total cost (USD)": "0.00051000",
+      "total cost (USD)": "0.00105000",
       "same cost on every record": true
     },
     "doc": "100 identical calls, 50 at once (No-Retention on): exactly 100 usage records with the right total cost"
@@ -960,7 +960,7 @@
     "message": "",
     "details": {
       "usage records": "100 / 100",
-      "total cost (USD)": "0.00051000",
+      "total cost (USD)": "0.00105000",
       "same cost on every record": true
     },
     "doc": "100 identical calls, 50 at once (No-Retention on): exactly 100 usage records with the right total cost"
@@ -972,5 +972,416 @@
     "message": "Failed: no usage or cost records while No-Retention (usage tracking off) is on",
     "details": {},
     "doc": "100 identical calls, 50 at once (No-Retention on): exactly 100 usage records with the right total cost"
+  },
+  {
+    "check": "test_weighted_split",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "split-a / split-b": "383 / 117 (77% / 23%)"
+    },
+    "doc": "Traffic is split by the configured weights (80 / 20, 500 requests)"
+  },
+  {
+    "check": "test_weighted_split",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "split-a / split-b": "399 / 101 (80% / 20%)"
+    },
+    "doc": "Traffic is split by the configured weights (80 / 20, 500 requests)"
+  },
+  {
+    "check": "test_region_routing",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "EU requests served by eu-model / us-model": "100 / 0",
+      "requests without a region went to eu / us (informational)": "22 / 18"
+    },
+    "doc": "Requests that ask for the EU region always go to the EU backend (100 requests)"
+  },
+  {
+    "check": "test_region_routing",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "EU requests served by eu-model / us-model": "100 / 0",
+      "requests without a region went to eu / us (informational)": "0 / 40"
+    },
+    "doc": "Requests that ask for the EU region always go to the EU backend (100 requests)"
+  },
+  {
+    "check": "test_fallback_chain_order",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "eu-broken -> eu-broken-2 -> eu-model"
+    },
+    "doc": "A fallback chain is tried in order: broken -> broken backup -> working backup"
+  },
+  {
+    "check": "test_fallback_chain_order",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "eu-broken -> eu-broken-2 -> eu-model"
+    },
+    "doc": "A fallback chain is tried in order: broken -> broken backup -> working backup"
+  },
+  {
+    "check": "test_failing_backend_taken_out",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "failed requests": "6 / 60",
+      "requests sent to the broken backend": 6
+    },
+    "doc": "A backend that keeps failing is taken out of rotation (60 requests, 1 of 2 backends broken; pass: at most 10 fail)"
+  },
+  {
+    "check": "test_failing_backend_taken_out",
+    "gateway": "bifrost",
+    "outcome": "failed",
+    "message": "AssertionError: the broken backend kept receiving traffic\nassert 34 <= 10",
+    "details": {
+      "failed requests": "34 / 60",
+      "requests sent to the broken backend": 34,
+      "why": "the free version has no automatic cooldown; the circuit breaker is Enterprise"
+    },
+    "doc": "A backend that keeps failing is taken out of rotation (60 requests, 1 of 2 backends broken; pass: at most 10 fail)"
+  },
+  {
+    "check": "test_reaches_aws_bedrock",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from eu.anthropic.claude-test-v1:0.",
+      "Bedrock saw": [
+        [
+          "eu.anthropic.claude-test-v1:0",
+          "eu-central-1",
+          "sigv4"
+        ]
+      ]
+    },
+    "doc": "Reaches AWS Bedrock (Converse API), signed for the EU region"
+  },
+  {
+    "check": "test_reaches_aws_bedrock",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from eu.anthropic.claude-test-v1:0.",
+      "Bedrock saw": [
+        [
+          "eu.anthropic.claude-test-v1:0",
+          "eu-central-1",
+          "sigv4"
+        ]
+      ]
+    },
+    "doc": "Reaches AWS Bedrock (Converse API), signed for the EU region"
+  },
+  {
+    "check": "test_reaches_azure_openai",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from gpt-eu-deploy.",
+      "Azure saw": [
+        [
+          "gpt-eu-deploy",
+          "/openai/deployments/gpt-eu-deploy/chat/completions",
+          "api-key"
+        ]
+      ]
+    },
+    "doc": "Reaches Azure OpenAI (EU deployment) with its API key"
+  },
+  {
+    "check": "test_reaches_azure_openai",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from gpt-eu-deploy.",
+      "Azure saw": [
+        [
+          "gpt-eu-deploy",
+          "/openai/v1/chat/completions",
+          "api-key"
+        ]
+      ]
+    },
+    "doc": "Reaches Azure OpenAI (EU deployment) with its API key"
+  },
+  {
+    "check": "test_reaches_azure_foundry_model",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from Mistral-Large-2411.",
+      "API used": [
+        [
+          "azure-foundry",
+          "/models/chat/completions"
+        ]
+      ]
+    },
+    "doc": "Reaches a non-OpenAI model (Mistral) on Azure AI Foundry"
+  },
+  {
+    "check": "test_reaches_azure_foundry_model",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from Mistral-Large-2411.",
+      "API used": [
+        [
+          "azure-openai",
+          "/openai/v1/chat/completions"
+        ]
+      ],
+      "caveat": "sent via Azure's OpenAI-compatible v1 API; check a real Foundry resource accepts it"
+    },
+    "doc": "Reaches a non-OpenAI model (Mistral) on Azure AI Foundry"
+  },
+  {
+    "check": "test_reaches_onprem_server",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from llama-3.1-8b.",
+      "on-prem server saw": [
+        [
+          "openai-compatible",
+          "/v1/chat/completions"
+        ]
+      ]
+    },
+    "doc": "Reaches an on-prem model server (vLLM, OpenAI-compatible)"
+  },
+  {
+    "check": "test_reaches_onprem_server",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "answer": "Reply from llama-3.1-8b.",
+      "on-prem server saw": [
+        [
+          "openai-compatible",
+          "/v1/chat/completions"
+        ]
+      ]
+    },
+    "doc": "Reaches an on-prem model server (vLLM, OpenAI-compatible)"
+  },
+  {
+    "check": "test_cross_cloud_fallback",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "azure-openai:broken-eu-deploy -> aws-bedrock:eu.anthropic.claude-test-v1:0"
+    },
+    "doc": "When Azure EU is down, requests fall back to AWS EU (never to a US provider)"
+  },
+  {
+    "check": "test_cross_cloud_fallback",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "provider calls, in order": "azure-openai:broken-eu-deploy -> aws-bedrock:eu.anthropic.claude-test-v1:0"
+    },
+    "doc": "When Azure EU is down, requests fall back to AWS EU (never to a US provider)"
+  },
+  {
+    "check": "test_sovereign_key_blocks_non_eu",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "EU model (aws-claude)": 200,
+      "US model (azure-us-gpt)": 403,
+      "US deployment reached": false
+    },
+    "doc": "An EU Sovereign key can use EU providers but never reaches the US Azure deployment"
+  },
+  {
+    "check": "test_sovereign_key_blocks_non_eu",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "EU model (aws-claude)": 200,
+      "US model (azure-us-gpt)": 403,
+      "US deployment reached": false
+    },
+    "doc": "An EU Sovereign key can use EU providers but never reaches the US Azure deployment"
+  },
+  {
+    "check": "test_key_without_access_gets_no_tools",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools offered to the model": "none",
+      "tools run": "none"
+    },
+    "doc": "A key without MCP access gets no tools and runs nothing"
+  },
+  {
+    "check": "test_key_without_access_gets_no_tools",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools offered to the model": "none",
+      "tools run": "none"
+    },
+    "doc": "A key without MCP access gets no tools and runs nothing"
+  },
+  {
+    "check": "test_key_limited_to_safe_tool",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools offered to the model": [
+        "search_files"
+      ],
+      "tools run": "none"
+    },
+    "doc": "A key limited to the safe tool only ever sees that tool"
+  },
+  {
+    "check": "test_key_limited_to_safe_tool",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools offered to the model": [
+        "search_files"
+      ],
+      "tools run": [
+        "search_files"
+      ]
+    },
+    "doc": "A key limited to the safe tool only ever sees that tool"
+  },
+  {
+    "check": "test_risky_tool_not_run_by_default",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tool call returned to the caller": [
+        "send_email"
+      ],
+      "tools the gateway ran": "none"
+    },
+    "doc": "With default settings, the risky tool is handed back to the caller, not run"
+  },
+  {
+    "check": "test_risky_tool_not_run_by_default",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tool call returned to the caller": [
+        "send_email"
+      ],
+      "tools the gateway ran": "none"
+    },
+    "doc": "With default settings, the risky tool is handed back to the caller, not run"
+  },
+  {
+    "check": "test_safe_tool_runs_when_enabled",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools the gateway ran": [
+        "search_files"
+      ],
+      "final answer": "Tool said: found 2 files for 'test'"
+    },
+    "doc": "When automatic running is switched on, the safe tool runs and the model gets its result"
+  },
+  {
+    "check": "test_safe_tool_runs_when_enabled",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools the gateway ran": [
+        "search_files"
+      ],
+      "final answer": "Tool said: found 2 files for 'test'"
+    },
+    "doc": "When automatic running is switched on, the safe tool runs and the model gets its result"
+  },
+  {
+    "check": "test_risky_tool_stays_manual_with_auto_run_on",
+    "gateway": "litellm",
+    "outcome": "failed",
+    "message": "AssertionError: the risky tool ran without approval\nassert 'send_email' not in ['send_email']",
+    "details": {
+      "tools the gateway ran": [
+        "send_email"
+      ],
+      "why": "require_approval: \"never\" applies to every tool the key can see; limit risky tools per key instead"
+    },
+    "doc": "Even with automatic running on, the risky tool still needs approval"
+  },
+  {
+    "check": "test_risky_tool_stays_manual_with_auto_run_on",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "tools the gateway ran": "none"
+    },
+    "doc": "Even with automatic running on, the risky tool still needs approval"
+  },
+  {
+    "check": "test_connector_secret_never_exposed",
+    "gateway": "litellm",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "in responses to the caller": false,
+      "in tool definitions sent to the model": false,
+      "in gateway logs": false
+    },
+    "doc": "The connector's secret token never reaches the caller, the model or the gateway logs"
+  },
+  {
+    "check": "test_connector_secret_never_exposed",
+    "gateway": "bifrost",
+    "outcome": "passed",
+    "message": "",
+    "details": {
+      "in responses to the caller": false,
+      "in tool definitions sent to the model": false,
+      "in gateway logs": false
+    },
+    "doc": "The connector's secret token never reaches the caller, the model or the gateway logs"
   }
 ]

@@ -42,6 +42,41 @@ BIFROST_ADMIN = ("admin", "Bf-" + secrets.token_hex(12))
 BIFROST_APP_KEY = "sk-bf-" + secrets.token_hex(16)      # virtual key: all models
 BIFROST_LIMITED_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: fast-model only
 BIFROST_RATELIMITED_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: 20 requests/minute
+BIFROST_SOVEREIGN_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: EU providers only
+BIFROST_AGENT_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: all MCP tools
+BIFROST_MCP_SEARCH_KEY = "sk-bf-" + secrets.token_hex(16)  # virtual key: MCP search_files only
+MCP_TOKEN = "mcp-secret-" + secrets.token_hex(12)  # the connector's secret (fake MCP server)
+MCP_URL = "http://gweval-mcp:9200/mcp"
+# Bifrost's Bedrock connector only accepts a TLS host for private endpoints, so the fake Bedrock
+# also listens on HTTPS under a DNS-style name, with a certificate generated per run.
+BEDROCK_HOST = "bedrock.mock.internal:9443"
+BEDROCK_CA_PEM = ""
+
+
+def make_tls_cert(out_dir: Path) -> str:
+    """Self-signed certificate for the fake Bedrock host. Returns the certificate PEM."""
+    from datetime import timedelta
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "bedrock.mock.internal")])
+    now = datetime.utcnow()
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5)).not_valid_after(now + timedelta(days=2))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName("bedrock.mock.internal")]),
+                           critical=False)
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(key, hashes.SHA256()))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    (out_dir / "cert.pem").write_text(pem)
+    (out_dir / "key.pem").write_bytes(key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()))
+    return pem
 # Fairness for the load tests: every gateway container gets the same CPU budget, and the
 # Python gateways (LiteLLM, MLflow) run one worker process per CPU. Bifrost (Go) uses its CPUs natively.
 GATEWAY_CPUS = 4
@@ -71,9 +106,11 @@ def cleanup() -> None:
 
 def run_container(name: str, image: str, args: list[str], *, ports: list[str] = (),
                   env: dict | None = None, mounts: list[str] = (), entrypoint: str | None = None,
-                  cpus: int | None = None):
+                  cpus: int | None = None, aliases: list[str] = ()):
     cmd = ["run", "-d", "--name", PREFIX + name, "--network", NET,
            "--network-alias", PREFIX + name]
+    for a in aliases:
+        cmd += ["--network-alias", a]
     if cpus:
         cmd += ["--cpus", str(cpus)]
     for p in ports:
@@ -119,7 +156,8 @@ def render(template: Path, out: Path, **values: str) -> Path:
 def start_litellm(profile: str, port: int) -> None:
     cfg = render(GATEWAYS_DIR / "litellm" / f"config.{profile}.yaml",
                  RUN_DIR / f"litellm-{profile}" / "config.yaml",
-                 MOCK_URL=MOCK_IN_NET, MASTER_KEY=MASTER_KEY, REDIS_HOST=PREFIX + "redis")
+                 MOCK_URL=MOCK_IN_NET, MASTER_KEY=MASTER_KEY, REDIS_HOST=PREFIX + "redis",
+                 MCP_URL=MCP_URL, MCP_TOKEN=MCP_TOKEN)
     env = {"DATABASE_URL": f"postgresql://postgres:{PG_PASSWORD}@gweval-pg:5432/litellm_{profile}"}
     if profile == "hardened":
         env["DISABLE_ADMIN_UI"] = "True"
@@ -138,7 +176,12 @@ def start_bifrost(profile: str, port: int) -> None:
                  RUN_DIR / f"bifrost-{profile}" / "config.json",
                  MOCK_URL=MOCK_IN_NET, BIFROST_ADMIN_PASSWORD=BIFROST_ADMIN[1],
                  BIFROST_APP_KEY=BIFROST_APP_KEY, BIFROST_LIMITED_KEY=BIFROST_LIMITED_KEY,
-                 BIFROST_RATELIMITED_KEY=BIFROST_RATELIMITED_KEY)
+                 BIFROST_RATELIMITED_KEY=BIFROST_RATELIMITED_KEY,
+                 BIFROST_SOVEREIGN_KEY=BIFROST_SOVEREIGN_KEY, BIFROST_AGENT_KEY=BIFROST_AGENT_KEY,
+                 BIFROST_MCP_SEARCH_KEY=BIFROST_MCP_SEARCH_KEY,
+                 BEDROCK_HOST=BEDROCK_HOST,
+                 BEDROCK_CA_PEM=json.dumps(BEDROCK_CA_PEM)[1:-1],  # JSON-escaped PEM
+                 MCP_URL=MCP_URL, MCP_TOKEN=MCP_TOKEN)
     run_container(f"bifrost-{profile}", IMAGES["bifrost"], [], ports=[f"{port}:8080"],
                   cpus=GATEWAY_CPUS,
                   mounts=[f"{cfg.resolve()}:/app/data/config.json:ro"])
@@ -185,6 +228,8 @@ def targets() -> dict:
     return {
         "run_dir": str(RUN_DIR),
         "mock": MOCK_FROM_HOST,
+        "mock_tls": "https://127.0.0.1:9443",  # same fake provider over HTTPS (Bifrost's Bedrock)
+        "mcp": {"url_from_host": "http://127.0.0.1:9200", "token": MCP_TOKEN},
         "images": IMAGES,
         # Only used by the security tests: MLflow with its optional login add-on switched on.
         "security_only": {
@@ -220,6 +265,9 @@ def targets() -> dict:
                 "auth_header": f"Bearer {BIFROST_APP_KEY}",
                 "limited_key": BIFROST_LIMITED_KEY,
                 "ratelimited_key": BIFROST_RATELIMITED_KEY,
+                "sovereign_key": BIFROST_SOVEREIGN_KEY,
+                "agent_key": BIFROST_AGENT_KEY,
+                "mcp_search_key": BIFROST_MCP_SEARCH_KEY,
                 "admin": list(BIFROST_ADMIN),
                 "sinks": [{"type": "logs", "container": PREFIX + "bifrost-hardened"},
                           {"type": "dir", "container": PREFIX + "bifrost-hardened",
@@ -254,7 +302,7 @@ def targets() -> dict:
 
 
 def save_logs() -> None:
-    for c in ["mock", "pg", "redis", "litellm-hardened", "litellm-default", "bifrost-hardened",
+    for c in ["mock", "mock-tls", "mcp", "pg", "redis", "litellm-hardened", "litellm-default", "bifrost-hardened",
               "bifrost-default", "mlflow", "mlflow-login"]:
         out = docker("logs", PREFIX + c, check=False)
         (RUN_DIR / f"{c}.log").write_text((out.stdout or "") + (out.stderr or ""),
@@ -277,6 +325,24 @@ def main() -> int:
                       ports=["9100:9100"], env={"MOCK_LATENCY_MS": "100", "PYTHONPATH": "/app"},
                       mounts=[f"{(ROOT / 'mock_provider').resolve()}:/app/mock_provider:ro"],
                       entrypoint="python")
+        # Fake MCP server (tool connector tests), same image for the same reason.
+        run_container("mcp", IMAGES["mlflow"],
+                      ["-m", "uvicorn", "mock_provider.mcp_server:app", "--host", "0.0.0.0",
+                       "--port", "9200", "--log-level", "warning", "--timeout-keep-alive", "65"],
+                      ports=["9200:9200"], env={"MCP_TOKEN": MCP_TOKEN, "PYTHONPATH": "/app"},
+                      mounts=[f"{(ROOT / 'mock_provider').resolve()}:/app/mock_provider:ro"],
+                      entrypoint="python")
+
+        global BEDROCK_CA_PEM
+        BEDROCK_CA_PEM = make_tls_cert(RUN_DIR / "tls")
+        run_container("mock-tls", IMAGES["mlflow"],
+                      ["-m", "uvicorn", "mock_provider.server:app", "--host", "0.0.0.0",
+                       "--port", "9443", "--log-level", "warning", "--timeout-keep-alive", "65",
+                       "--ssl-certfile", "/tls/cert.pem", "--ssl-keyfile", "/tls/key.pem"],
+                      ports=["9443:9443"], env={"MOCK_LATENCY_MS": "100", "PYTHONPATH": "/app"},
+                      mounts=[f"{(ROOT / 'mock_provider').resolve()}:/app/mock_provider:ro",
+                              f"{(RUN_DIR / 'tls').resolve()}:/tls:ro"],
+                      entrypoint="python", aliases=["bedrock.mock.internal"])
 
         run_container("pg", IMAGES["postgres"], [], env={"POSTGRES_PASSWORD": PG_PASSWORD})
         run_container("redis", IMAGES["redis"], [])  # LiteLLM: shared limits across workers
@@ -304,6 +370,7 @@ def main() -> int:
         start_mlflow("mlflow-login", 5001, login=True)
 
         wait_http(f"{MOCK_FROM_HOST}/health")
+        wait_http("http://127.0.0.1:9200/health")
         auth = {"Authorization": f"Bearer {MASTER_KEY}"}
         for port in (4000, 4001):
             wait_http(f"http://127.0.0.1:{port}/health/liveliness", timeout=300, headers=auth)

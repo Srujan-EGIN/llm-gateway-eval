@@ -9,6 +9,26 @@ Sources are the official docs (linked at the end) and Bifrost's v2.2.6 config sc
 | Question | LiteLLM | Bifrost | For Genie |
 |---|---|---|---|
 | **How is a model picked?** | Model groups + a strategy (random by weight, least busy, latency, cost); tags restrict it | Virtual key → CEL routing rules → weights | Genie's kernel decides; the gateway only balances and falls back **within** what the kernel allows |
+| **Weighted split, EU routing, fallback chain** | ✅ all tested 🧪 | ✅ all tested 🧪 | Both fine |
+| **Failing backend taken out of rotation?** | ✅ automatic cooldown 🧪 | ❌ not in the free version (circuit breaker is paid); about half the requests failed 🧪 | LiteLLM, or Bifrost Enterprise |
+| **AWS Bedrock** | ✅ 🧪 | ✅ 🧪 (private endpoints need a TLS host name) | Both |
+| **Azure OpenAI** | ✅ 🧪 | ✅ 🧪 | Both |
+| **Azure AI Foundry** (Mistral, Llama…) | ✅ Foundry inference API 🧪 | ✅ via Azure's OpenAI v1 API 🧪 (real Foundry to confirm) | LiteLLM is the more direct fit |
+| **On-prem** (vLLM, Ollama) | ✅ 🧪 | ✅ 🧪 | Both |
+| **Cross-cloud fallback, EU Sovereign key** | ✅ 🧪 | ✅ 🧪 | Both |
+| **Tool connectors (MCP)** | Per-key and per-tool access ✅ 🧪; **auto-run covers every tool** ❌ 🧪 | Per-key access ✅ 🧪; auto-run is a per-tool list ✅ 🧪 | **Don't use yet.** Gateways keep tokens per *user*; Genie needs per *user + context*, with tokens and approvals in the kernel |
+
+**Bottom line:**
+- **Routing:** both are capable, but only LiteLLM (free) stops sending traffic to a failing backend. Keep the routing *policy* in Genie.
+- **Providers:** both reached AWS, Azure, Foundry and on-prem in the tests. LiteLLM uses Foundry's own API; Bifrost's route still needs checking against a real Foundry resource.
+- **Connectors:** keep them in Genie's own connector service, and leave the gateways' MCP features off.
+  - If they are ever used, Bifrost's per-tool auto-run is the safer design.
+  - With LiteLLM, keep risky tools off the key.
+
+**Test results:** groups 7–9 in this repo (`tests/test_7_routing.py`, `test_8_providers.py`, `test_9_mcp.py`). LiteLLM passed 15/16 and Bifrost 15/16. See the README for the full table.
+
+---|---|---|---|
+| **How is a model picked?** | Model groups + a strategy (random by weight, least busy, latency, cost); tags restrict it | Virtual key → CEL routing rules → weights | Genie's kernel decides; the gateway only balances and falls back **within** what the kernel allows |
 | **Fallback?** | Yes, plus automatic cooldown of failing deployments | Yes; cooldown/circuit breaker is paid | Both fine; tested 🧪 |
 | **EU-only routing?** | Tags (old region routing is deprecated) | Rules + allowed models per key | Use one key per compliance mode (tested 🧪) |
 | **AWS Bedrock** | ✅ | ✅ | Both |
@@ -76,12 +96,12 @@ Genie's architecture puts the **decision** in the kernel. The kernel filters mod
 |---|---|---|
 | **AWS Bedrock** | `model: bedrock/<model-id>` (Converse); IAM role or keys; cross-region and application inference profile ARNs; guardrails passthrough | `bedrock` provider: `region`; IAM default chain, static keys, STS AssumeRole or API key; inference profiles; prompt caching. The docs don't mention `eu.` profile IDs; test before relying on them |
 | **Azure OpenAI** | `model: azure/<deployment>` | `azure` provider: `endpoint`; Entra ID, API key, or managed identity (DefaultAzureCredential); deployments via `aliases` |
-| **Azure AI Foundry** (non-OpenAI models) | `model: azure_ai/<model>` with `api_base`; examples include Mistral, Cohere, Claude on Foundry | Docs cover OpenAI and Claude via Azure; **Mistral/Llama on Foundry not documented**, so use a custom OpenAI-compatible provider pointed at the Foundry endpoint (to verify) |
+| **Azure AI Foundry** (non-OpenAI models) | `model: azure_ai/<model>` with `api_base`; examples include Mistral, Cohere, Claude on Foundry | Docs cover OpenAI and Claude via Azure. In the tests a Mistral model was reached through the `azure` provider (Azure's OpenAI v1 API) 🧪; whether a real Foundry resource accepts that still needs checking |
 | **On-prem** (vLLM, Ollama, TGI) | `hosted_vllm/…`, `ollama/…`, or any OpenAI-compatible `api_base` 🧪 (the fake provider is one) | `vllm`, `ollama` providers, or a **custom provider** with `base_provider_type: openai` and your `base_url` 🧪 |
 | **Same provider twice** (e.g. Azure EU + Azure US) | Two deployments with different `api_base`, same or different `model_name` | Custom providers: several named instances of one base type (`openai-west`, `openai-east`) |
 | **Coverage** | 100+ providers | ~30 built-in, plus custom OpenAI-compatible |
 
-**For a three-provider Genie (AWS + Azure Foundry + on-prem):** both can route to all three.
+**For a three-provider Genie (AWS + Azure Foundry + on-prem):** both routed to all three in the tests 🧪, including an Azure EU → AWS EU fallback.
 - **LiteLLM** supports Azure AI Foundry's non-OpenAI models directly.
 - With **Bifrost**, Foundry's Mistral or Llama models would go through the custom-provider route, which still has to be tested.
 

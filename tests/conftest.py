@@ -58,12 +58,30 @@ def pytest_runtest_makereport(item, call):
 
 
 # ---------------------------------------------------------------- helpers
+def _mock_urls() -> list[str]:
+    return [TARGETS["mock"]] + ([TARGETS["mock_tls"]] if TARGETS.get("mock_tls") else [])
+
+
 def mock_calls() -> list[dict]:
-    return httpx.get(TARGETS["mock"] + "/_calls").json()
+    """Every call the fake provider received (HTTP and HTTPS listeners), oldest first."""
+    calls = []
+    for url in _mock_urls():
+        calls += httpx.get(url + "/_calls", verify=False).json()
+    return sorted(calls, key=lambda c: c["time"])
 
 
 def reset_mock() -> None:
-    httpx.delete(TARGETS["mock"] + "/_calls")
+    for url in _mock_urls():
+        httpx.delete(url + "/_calls", verify=False)
+
+
+def mcp_calls() -> list[dict]:
+    """Every tool call the fake MCP server actually executed."""
+    return httpx.get(TARGETS["mcp"]["url_from_host"] + "/_calls").json()
+
+
+def reset_mcp() -> None:
+    httpx.delete(TARGETS["mcp"]["url_from_host"] + "/_calls")
 
 
 def new_canary() -> str:

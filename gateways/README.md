@@ -25,4 +25,10 @@ All gateways get the **same setup**:
 
 **Same resources for the load tests:** every gateway container is capped at 4 CPUs; LiteLLM (hardened) and MLflow run 4 worker processes; LiteLLM also gets Redis (via `REDIS_HOST`/`REDIS_PORT`) so rate limits are shared across workers. Bifrost has a 20 requests/minute virtual key (`rate-limited`) for the rate-limit test.
 
+**Routing and connector setups (hardened profile, LiteLLM and Bifrost):**
+- `split-model` (80/20), `regional-chat` (EU/US; LiteLLM tag `region:eu`, Bifrost rule on header `x-region: eu`), `eu-primary` (fallback chain), `flaky-model` (one broken backend).
+- `aws-claude` (Bedrock, eu-central-1), `azure-gpt` / `azure-us-gpt` (Azure OpenAI EU/US), `foundry-mistral` (Azure AI Foundry), `onprem-llama` (vLLM), and `eu-assistant` (Azure EU down → AWS EU).
+- An EU Sovereign key: LiteLLM key with a model list; Bifrost `eu-sovereign` virtual key.
+- MCP server `files` (`search_files`, `send_email`) with per-key access. Bifrost keys: `app` (no MCP), `mcp-search-only`, `agent` (all tools; only `search_files` auto-runs).
+
 Images are pinned by digest in [`../images.json`](../images.json).

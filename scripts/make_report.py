@@ -28,6 +28,15 @@ SECTIONS = {
                                  "test_fallback_under_load", "test_key_limits_under_load",
                                  "test_rate_limit_under_burst", "test_no_retention_under_load",
                                  "test_usage_counted_under_load", "test_no_errors_under_load"],
+    "Routing": ["test_weighted_split", "test_region_routing", "test_fallback_chain_order",
+                "test_failing_backend_taken_out"],
+    "Provider connectors (AWS, Azure, on-prem)": [
+        "test_reaches_aws_bedrock", "test_reaches_azure_openai", "test_reaches_azure_foundry_model",
+        "test_reaches_onprem_server", "test_cross_cloud_fallback", "test_sovereign_key_blocks_non_eu"],
+    "Tool connectors (MCP)": [
+        "test_key_without_access_gets_no_tools", "test_key_limited_to_safe_tool",
+        "test_risky_tool_not_run_by_default", "test_safe_tool_runs_when_enabled",
+        "test_risky_tool_stays_manual_with_auto_run_on", "test_connector_secret_never_exposed"],
     "Speed": ["test_overhead", "test_throughput"],
 }
 

@@ -28,6 +28,73 @@
         "max_retries": 0,
         "keep_alive_timeout_in_seconds": 30
       }
+    },
+    "bedrock": {
+      "keys": [
+        {
+          "name": "aws-eu",
+          "models": [
+            "*"
+          ],
+          "weight": 1,
+          "bedrock_key_config": {
+            "access_key": "AKIAFAKEFAKEFAKE",
+            "secret_key": "fake-secret",
+            "region": "eu-central-1",
+            "endpoints": {
+              "runtime": "${BEDROCK_HOST}",
+              "control_plane": "${BEDROCK_HOST}"
+            }
+          }
+        }
+      ],
+      "network_config": {
+        "allow_private_network": true,
+        "max_retries": 0,
+        "keep_alive_timeout_in_seconds": 30,
+        "ca_cert_pem": "${BEDROCK_CA_PEM}"
+      }
+    },
+    "azure": {
+      "keys": [
+        {
+          "name": "azure-eu",
+          "value": "fake-azure-key",
+          "models": [
+            "*"
+          ],
+          "weight": 1,
+          "azure_key_config": {
+            "endpoint": "${MOCK_URL}"
+          }
+        }
+      ],
+      "network_config": {
+        "allow_private_network": true,
+        "max_retries": 0,
+        "keep_alive_timeout_in_seconds": 30
+      }
+    },
+    "vllm": {
+      "keys": [
+        {
+          "name": "onprem",
+          "value": "",
+          "models": [
+            "*"
+          ],
+          "weight": 1,
+          "vllm_key_config": {
+            "url": "${MOCK_URL}",
+            "model_name": "llama-3.1-8b"
+          }
+        }
+      ],
+      "network_config": {
+        "allow_private_network": true,
+        "max_retries": 0,
+        "keep_alive_timeout_in_seconds": 30
+      }
     }
   },
   "governance": {
@@ -42,6 +109,39 @@
             "provider": "openai",
             "allowed_models": [
               "*"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          },
+          {
+            "provider": "bedrock",
+            "allowed_models": [
+              "eu.anthropic.claude-test-v1:0"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          },
+          {
+            "provider": "azure",
+            "allowed_models": [
+              "gpt-eu-deploy",
+              "gpt-us-deploy",
+              "Mistral-Large-2411",
+              "broken-eu-deploy"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          },
+          {
+            "provider": "vllm",
+            "allowed_models": [
+              "llama-3.1-8b"
             ],
             "weight": 1,
             "key_ids": [
@@ -86,6 +186,98 @@
             ]
           }
         ]
+      },
+      {
+        "id": "vk-sovereign",
+        "name": "eu-sovereign",
+        "value": "${BIFROST_SOVEREIGN_KEY}",
+        "is_active": true,
+        "provider_configs": [
+          {
+            "provider": "bedrock",
+            "allowed_models": [
+              "eu.anthropic.claude-test-v1:0"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          },
+          {
+            "provider": "vllm",
+            "allowed_models": [
+              "llama-3.1-8b"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          },
+          {
+            "provider": "azure",
+            "allowed_models": [
+              "gpt-eu-deploy",
+              "Mistral-Large-2411",
+              "broken-eu-deploy"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vk-agent",
+        "name": "agent",
+        "value": "${BIFROST_AGENT_KEY}",
+        "is_active": true,
+        "provider_configs": [
+          {
+            "provider": "openai",
+            "allowed_models": [
+              "*"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          }
+        ],
+        "mcp_configs": [
+          {
+            "mcp_client_name": "files",
+            "tools_to_execute": [
+              "*"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "vk-mcp-search",
+        "name": "mcp-search-only",
+        "value": "${BIFROST_MCP_SEARCH_KEY}",
+        "is_active": true,
+        "provider_configs": [
+          {
+            "provider": "openai",
+            "allowed_models": [
+              "*"
+            ],
+            "weight": 1,
+            "key_ids": [
+              "*"
+            ]
+          }
+        ],
+        "mcp_configs": [
+          {
+            "mcp_client_name": "files",
+            "tools_to_execute": [
+              "search_files"
+            ]
+          }
+        ]
       }
     ],
     "routing_rules": [
@@ -105,6 +297,188 @@
         ],
         "fallbacks": [
           "openai/backup-model"
+        ]
+      },
+      {
+        "id": "split-model",
+        "name": "split-model",
+        "enabled": true,
+        "cel_expression": "model == 'split-model'",
+        "scope": "global",
+        "priority": 3,
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "split-a",
+            "weight": 0.8
+          },
+          {
+            "provider": "openai",
+            "model": "split-b",
+            "weight": 0.2
+          }
+        ]
+      },
+      {
+        "id": "regional-eu",
+        "name": "regional-eu",
+        "enabled": true,
+        "cel_expression": "model == 'regional-chat' && headers['x-region'] == 'eu'",
+        "scope": "global",
+        "priority": 1,
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "eu-model",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "regional-default",
+        "name": "regional-default",
+        "enabled": true,
+        "cel_expression": "model == 'regional-chat'",
+        "scope": "global",
+        "priority": 2,
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "us-model",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "eu-primary",
+        "name": "eu-primary",
+        "enabled": true,
+        "cel_expression": "model == 'eu-primary'",
+        "scope": "global",
+        "priority": 4,
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "eu-broken",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "openai/eu-broken-2",
+          "openai/eu-model"
+        ]
+      },
+      {
+        "id": "flaky-model",
+        "name": "flaky-model",
+        "enabled": true,
+        "cel_expression": "model == 'flaky-model'",
+        "scope": "global",
+        "priority": 5,
+        "targets": [
+          {
+            "provider": "openai",
+            "model": "flaky-broken",
+            "weight": 0.5
+          },
+          {
+            "provider": "openai",
+            "model": "flaky-ok",
+            "weight": 0.5
+          }
+        ]
+      },
+      {
+        "id": "aws-claude",
+        "name": "aws-claude",
+        "enabled": true,
+        "cel_expression": "model == 'aws-claude'",
+        "scope": "global",
+        "priority": 6,
+        "targets": [
+          {
+            "provider": "bedrock",
+            "model": "eu.anthropic.claude-test-v1:0",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "azure-gpt",
+        "name": "azure-gpt",
+        "enabled": true,
+        "cel_expression": "model == 'azure-gpt'",
+        "scope": "global",
+        "priority": 7,
+        "targets": [
+          {
+            "provider": "azure",
+            "model": "gpt-eu-deploy",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "azure-us-gpt",
+        "name": "azure-us-gpt",
+        "enabled": true,
+        "cel_expression": "model == 'azure-us-gpt'",
+        "scope": "global",
+        "priority": 8,
+        "targets": [
+          {
+            "provider": "azure",
+            "model": "gpt-us-deploy",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "foundry-mistral",
+        "name": "foundry-mistral",
+        "enabled": true,
+        "cel_expression": "model == 'foundry-mistral'",
+        "scope": "global",
+        "priority": 9,
+        "targets": [
+          {
+            "provider": "azure",
+            "model": "Mistral-Large-2411",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "onprem-llama",
+        "name": "onprem-llama",
+        "enabled": true,
+        "cel_expression": "model == 'onprem-llama'",
+        "scope": "global",
+        "priority": 10,
+        "targets": [
+          {
+            "provider": "vllm",
+            "model": "llama-3.1-8b",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "id": "eu-assistant",
+        "name": "eu-assistant",
+        "enabled": true,
+        "cel_expression": "model == 'eu-assistant'",
+        "scope": "global",
+        "priority": 11,
+        "targets": [
+          {
+            "provider": "azure",
+            "model": "broken-eu-deploy",
+            "weight": 1
+          }
+        ],
+        "fallbacks": [
+          "bedrock/eu.anthropic.claude-test-v1:0"
         ]
       }
     ],
@@ -129,5 +503,24 @@
     "config": {
       "path": "/app/data/logs.db"
     }
+  },
+  "mcp": {
+    "client_configs": [
+      {
+        "name": "files",
+        "connection_type": "http",
+        "connection_string": "${MCP_URL}",
+        "auth_type": "headers",
+        "headers": {
+          "Authorization": "Bearer ${MCP_TOKEN}"
+        },
+        "tools_to_execute": [
+          "*"
+        ],
+        "tools_to_auto_execute": [
+          "search_files"
+        ]
+      }
+    ]
   }
 }
