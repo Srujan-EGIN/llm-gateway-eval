@@ -4,6 +4,8 @@ A hands-on test lab that runs **LiteLLM Proxy**, **Bifrost** and **MLflow AI Gat
 
 **➡️ Full results: [`results/REPORT.md`](results/REPORT.md)**
 
+**➡️ How model routing and connectors work (LiteLLM vs Bifrost): [`docs/ROUTING-AND-CONNECTORS.md`](docs/ROUTING-AND-CONNECTORS.md)**
+
 ## Final verdict
 
 | Area (number of graded checks) | LiteLLM Proxy | Bifrost | MLflow AI Gateway |
